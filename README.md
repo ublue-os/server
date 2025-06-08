@@ -1,0 +1,3 @@
+# a Universal Blue server project - WIP
+
+Gotta start somewhere...
