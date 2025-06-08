@@ -1,0 +1,58 @@
+---
+centos-10: &centos-10
+  from: quay.io/centos-bootc/centos-bootc:c10s
+  version: 10
+server: &server
+  org: ublue-os
+  registry: ghcr.io
+  repo: server
+  cppFlags: []
+server-base: &server-base
+  <<: *server
+  name: server
+server-nas: &server-nas
+  <<: *server
+  name: server-nas
+server-hci-10: &server-hci
+  <<: *server
+  name: server-hci
+
+images:
+  server-base-10-main:
+    !!merge <<: 
+      - *centos-10
+      - *server-base
+    description: "A bootc lightweight server image with ZFS included"
+  server-nas-10-main:
+    !!merge <<: 
+      - *centos-10
+      - *server-nas
+    cppFlags: [ NAS ]
+    description: "A bootc NAS image with ZFS included"
+  server-hci-10-main:
+    !!merge <<: 
+      - *centos-10
+      - *server-hci
+    cppFlags: [ HCI ]
+    description: "A bootc Hyper-Converged Infrastructure image with ZFS included"
+  server-base-10-nvidia:
+    !!merge <<: 
+      - *centos-10
+      - *server-base
+    cppFlags: [ NVIDIA ]
+    description: "A bootc lightweight server image with ZFS and NVIDIA included"
+    name: server-nvidia
+  server-nas-10-nvidia:
+    !!merge <<: 
+      - *centos-10
+      - *server-nas
+    cppFlags: [ NAS, NVIDIA ]
+    description: "A bootc NAS image with ZFS and NVIDIA included"
+    name: server-nas-nvidia
+  server-hci-10-nvidia:
+    !!merge <<: 
+      - *centos-10
+      - *server-hci
+    cppFlags: [ HCI, NVIDIA ]
+    description: "A bootc Hyper-Converged Infrastructure image with ZFS and NVIDIA included"
+    name: server-hci-nvidia
