@@ -129,7 +129,7 @@ build-container $image="server" $variant="base" $version="10" $flavor="main":
     LABELS=(
         "--label" "org.opencontainers.image.title=$(image-get name)"
         "--label" "org.opencontainers.image.version=${VERSION}"
-        "--label" "org.opencontainers.image.description=\"$(image-get description)\""
+        "--label" "org.opencontainers.image.description=$(image-get description)"
         #"--label" "ostree.linux=${KERNEL_VERSION}"
         "--label" "io.artifacthub.package.readme-url=https://raw.githubusercontent.com/$(image-get registry)/$(image-get org)/$(image-get repo)/main/README.md"
         "--label" "io.artifacthub.package.logo-url=https://avatars.githubusercontent.com/u/120078124?s=200&v=4"
@@ -140,10 +140,10 @@ build-container $image="server" $variant="base" $version="10" $flavor="main":
         "--security-opt=label=disable"
         "--cap-add=all"
         "--device" "/dev/fuse"
-        "--cpp-flag=\"-DSOURCE_IMAGE=$(image-get from)\""
+        "--cpp-flag=-DSOURCE_IMAGE=$(image-get from)"
     )
     for FLAG in $(image-get "cppFlags[]"); do
-        BUILD_ARGS+=("--cpp-flag=\"-D$FLAG=1\"")
+        BUILD_ARGS+=("--cpp-flag=-D$FLAG=1")
     done
 
     # Build Image
