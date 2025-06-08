@@ -1,0 +1,79 @@
+FROM scratch AS ctx
+COPY build_files /
+
+FROM SOURCE_IMAGE as server
+
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/01-common.sh && \
+    /ctx/98-cleanup.sh
+
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/02-docker.sh && \
+    /ctx/98-cleanup.sh
+
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/10-base-packages.sh && \
+    /ctx/98-cleanup.sh
+
+#ifdef INCL_NVIDIA
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/11-base-nvidia.sh && \
+    /ctx/98-cleanup.sh
+#endif /* INCL_NVIDIA */
+
+#ifdef INCL_ZFS
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/12-base-zfs.sh && \
+    /ctx/98-cleanup.sh
+#endif /* INCL_ZFS */
+
+#ifdef INCL_NAS
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/20-nas-packages.sh && \
+    /ctx/98-cleanup.sh
+
+#ifdef INCL_ZFS
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/22-nas-zfs.sh && \
+    /ctx/98-cleanup.sh
+#endif /* INCL_ZFS */
+#endif /* INCL_NAS */
+
+#ifdef INCL_VIRT
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/30-virt-packages.sh && \
+    /ctx/98-cleanup.sh
+#endif /* INCL_VIRT */
+
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/90-disable-repos.sh && \
+    /ctx/98-cleanup.sh && \
+    /ctx/99-finalize.sh && \
+    bootc container lint
