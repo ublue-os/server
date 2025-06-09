@@ -6,8 +6,8 @@ mkdir -m 0700 -p /var/roothome /var/opt
 
 # make /usr/local and /opt writable
 mkdir -m 0755 -p /var/opt /var/usrlocal
-ln -s /var/opt /opt
-ln -s /var/usrlocal /usr/local
+ln -sf /var/opt /opt
+ln -sf /var/usrlocal /usr/local
 
 # remove subscription manager
 dnf -y remove \
