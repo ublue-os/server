@@ -4,6 +4,7 @@ set -e
 
 dnf5 install -y \
     ShellCheck \
+    buildah \
     cpp \
     dosfstools \
     erofs-utils \
