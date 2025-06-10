@@ -19,9 +19,12 @@ dnf -y install --setopt=install_weak_deps=False \
 
 # TODO: these require EPEL packages to be built for el10
 #    duperemove \
-#    rclone \
-#    snapraid \
+
+dnf -y copr enable ublue-os/staging
+dnf -y install snapraid
+dnf -y copr disable ublue-os/staging
 
 ### install packages direct from github
-# TODO: needs a request to trapexit for el10 build
-#/ctx/github-release-install.sh trapexit/mergerfs "el${RELEASE}.x86_64"
+### NOTE: we need to get proper arch for these packages rather than hard coding
+/ctx/github-release-install.sh rclone/rclone "linux-amd64"
+/ctx/github-release-install.sh trapexit/mergerfs "el${RELEASE}.x86_64"
