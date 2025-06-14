@@ -27,3 +27,5 @@ dnf -y install --setopt=install_weak_deps=False \
   tailscale \
   tmux \
   wireguard-tools
+
+dnf config-manager --set-disabled tailscale-stable

@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -xeuo pipefail
 
-### install base server ZFS packages
-#dnf -y install https://zfsonlinux.org/epel/zfs-release-2-3$(rpm --eval "%{dist}").noarch.rpm
-#dnf config-manager --disable zfs
-#dnf config-manager --enable zfs-kmod
-#dnf -y install zfs pv
-#dnf config-manager --disable zfs-kmod
-echo "TODO: add ublue-os/akmods ZFS install here"
+### install base server ZFS packages and sanoid dependencies
+dnf -y install \
+    pv \
+    /tmp/akmods-zfs-rpms/kmods/zfs/*.rpm \
+    /tmp/akmods-zfs-rpms/kmods/zfs/other/zfs-dracut-*.rpm
+
+# depmod ran automatically with zfs 2.1 but not with 2.2
+KERNEL_VRA="$(rpm -q "kernel" --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}')"
+depmod -a -v "${KERNEL_VRA}"

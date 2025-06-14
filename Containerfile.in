@@ -1,6 +1,10 @@
 FROM scratch AS ctx
 COPY build_files /
 
+#ifdef NVIDIA
+FROM NVIDIA as akmods_nvidia
+#endif /* NVIDIA */
+FROM ZFS as akmods_zfs
 FROM SOURCE_IMAGE as server
 
 RUN --mount=type=cache,dst=/var/cache \
@@ -28,6 +32,7 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/tmp \
+    --mount=type=bind,from=akmods_zfs,src=/rpms,dst=/tmp/akmods-zfs-rpms \
     /ctx/11-base-zfs.sh && \
     /ctx/98-cleanup.sh
 
@@ -36,6 +41,7 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/tmp \
+    --mount=type=bind,from=akmods_nvidia,src=/rpms,dst=/tmp/akmods-nv-rpms \
     /ctx/12-base-nvidia.sh && \
     /ctx/98-cleanup.sh
 #endif /* NVIDIA */
