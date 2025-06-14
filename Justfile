@@ -201,17 +201,13 @@ build-container $image="" $variant="" $flavor="" $version="":
         "--security-opt=label=disable"
         "--cap-add=all"
         "--device" "/dev/fuse"
+        "--cpp-flag=-DSOURCE_IMAGE=$source_image"
+        "--cpp-flag=-DZFS=$image_registry/akmods-zfs:centos-stream$version"
     )
     for FLAG in $image_cpp_flags; do
         case "${FLAG:-}" in
-        "SOURCE_IMAGE")
-            BUILD_ARGS+=("--cpp-flag=-D$FLAG=$source_image")
-            ;;
         "NVIDIA")
             BUILD_ARGS+=("--cpp-flag=-D$FLAG=$image_registry/akmods-nvidia:centos-stream$version")
-            ;;
-        "ZFS")
-            BUILD_ARGS+=("--cpp-flag=-D$FLAG=$image_registry/akmods-zfs:centos-stream$version")
             ;;
         *)
             BUILD_ARGS+=("--cpp-flag=-D$FLAG=1")
@@ -231,12 +227,11 @@ build-container $image="" $variant="" $flavor="" $version="":
 
 # Removes all Tags of an image from container storage.
 [group('Utility')]
-clean $image="" $variant="" $flavor="" $version="" $registry="":
+clean $image $variant $flavor $version $registry="":
     #!/usr/bin/env bash
     set -xeou pipefail
 
     : "${registry:=localhost}"
-    {{ default-inputs }}
     {{ get-names }}
     declare -a CLEAN="($({{ podman }} image list $registry/$image_name --noheading --format 'table {{{{ .ID }}' | uniq))"
     if [[ -n "${CLEAN[@]:-}" ]]; then

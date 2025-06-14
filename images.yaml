@@ -6,18 +6,18 @@ server: &server
   org: ublue-os
   registry: ghcr.io
   repo: server
-  cppFlags: [ SOURCE_IMAGE, ZFS ]
+  cppFlags: []
 server-base: &server-base
   <<: *server
   name: server
 server-nas: &server-nas
   <<: *server
   name: server-nas
-  cppFlags: [ SOURCE_IMAGE, ZFS, NAS ]
+  cppFlags: [ NAS ]
 server-hci: &server-hci
   <<: *server
   name: server-hci
-  cppFlags: [ SOURCE_IMAGE, ZFS, HCI ]
+  cppFlags: [ HCI ]
 
 images:
   server-base-main-10:
@@ -39,20 +39,20 @@ images:
     !!merge <<: 
       - *centos-10
       - *server-base
-    cppFlags: [ SOURCE_IMAGE, ZFS, NVIDIA ]
+    cppFlags: [ NVIDIA ]
     description: "A bootc lightweight server image with ZFS and NVIDIA included"
     name: server-nvidia
   server-nas-nvidia-10:
     !!merge <<: 
       - *centos-10
       - *server-nas
-    cppFlags: [ SOURCE_IMAGE, ZFS, NAS, NVIDIA ]
+    cppFlags: [ NAS, NVIDIA ]
     description: "A bootc NAS image with ZFS and NVIDIA included"
     name: server-nas-nvidia
   server-hci-nvidia-10:
     !!merge <<: 
       - *centos-10
       - *server-hci
-    cppFlags: [ SOURCE_IMAGE, ZFS, HCI, NVIDIA ]
+    cppFlags: [ HCI, NVIDIA ]
     description: "A bootc Hyper-Converged Infrastructure image with ZFS and NVIDIA included"
     name: server-hci-nvidia
