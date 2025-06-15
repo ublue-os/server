@@ -218,10 +218,8 @@ build-container $image="" $variant="" $flavor="" $version="":
     # Pull Images with retry
     pull-retry "$source_image"
     pull-retry "$image_registry/akmods-zfs:centos-stream$version"
-    if [ "nvidia" == "$flavor" ]; then
-        pull-retry "$image_registry/akmods-nvidia:centos-stream$version"
-    fi
-
+    {{ if flavor == 'nvidia' { 'pull-retry "$image_registry/akmods-nvidia:centos-stream$version"
+' } else { '' } }}
     # Build Image
     {{ podman }} build -f Containerfile.in "${BUILD_ARGS[@]}" "${LABELS[@]}" "${TAGS[@]}" .
 
