@@ -9,7 +9,7 @@ dnf -y install --setopt=install_weak_deps=False \
   docker-ce-cli \
   containerd.io \
   docker-buildx-plugin \
-  docker-compose-plugin \
+  docker-compose-plugin
 
 # prefer to have docker-compose available for legacy muscle-memory
 ln -s /usr/libexec/docker/cli-plugins/docker-compose /usr/bin/docker-compose
@@ -19,5 +19,11 @@ mkdir -p /usr/lib/sysctl.d
 echo "net.ipv4.ip_forward = 1" >/usr/lib/sysctl.d/docker-ce.conf
 
 dnf config-manager --set-disabled docker-ce-stable
-# TODO: check default service state (should be disabled)
-# TODO: handle group problem with bootc container lint
+
+# Disable the docker service by default
+systemctl disable docker.service
+
+# sysusers.d for docker
+cat >/usr/lib/sysusers.d/docker.conf <<'EOF'
+g docker -
+EOF

@@ -3,6 +3,11 @@ set unstable := true
 just := just_executable()
 podman := require('podman')
 
+image := "server"
+variant := "base"
+version := "10"
+flavor := "main"
+
 _default:
     @just --list --unsorted
 
@@ -11,10 +16,10 @@ podman-info:
 
 [private]
 default-inputs := '
-: ${image:=server}
-: ${variant:=base}
-: ${version:=10}
-: ${flavor:=main}
+: ${image:=' + image + '}
+: ${variant:=' + variant + '}
+: ${version:=' + version + '}
+: ${flavor:=' + flavor + '}
 '
 [private]
 get-names := '''
@@ -154,8 +159,8 @@ run-container $image="" $variant="" $flavor="" $version="":
     {{ default-inputs }}
     {{ get-names }}
     {{ build-missing }}
-    echo "{{ style('warning') }}Running:{{ NORMAL }} {{ style('command') }}{{ just }} run -it --rm localhost/$image_name:$image_version bash {{ NORMAL }}"
-    {{ podman }} run -it --rm "localhost/$image_name:$image_version" bash || exit 0
+    echo "{{ style('warning') }}Running:{{ NORMAL }} {{ style('command') }}{{ just }} run -it --rm localhost/$image_name:$image_version bash -l {{ NORMAL }}"
+    {{ podman }} run -it --rm "localhost/$image_name:$image_version" bash -l || exit 0
 
 # Build a Container
 

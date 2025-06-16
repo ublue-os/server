@@ -1,11 +1,11 @@
 #!/usr/bin/bash
+#shellcheck disable=SC2115
 
 set -eoux pipefail
 
-dnf clean all
-rm -rf /tmp/* || true
-find /var/* -maxdepth 0 -type d \! -name cache -exec rm -fr {} \;
-find /var/cache/* -maxdepth 0 -type d \! -name libdnf5 \! -name rpm-ostree -exec rm -fr {} \;
+# Make Sure /tmp and /var are in proper state
+rm -rf /tmp/*
+rm -rf /var/*
 mkdir -p /var/tmp
 chmod -R 1777 /var/tmp
 
