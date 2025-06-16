@@ -8,3 +8,6 @@ for R in docker-ce; do
     sed -i "s@enabled=1@enabled=0@" "${REPO}"
   fi
 done
+
+# Remove Versionlocks
+dnf versionlock clear
