@@ -8,30 +8,34 @@ FROM ZFS as akmods_zfs
 FROM SOURCE_IMAGE as server
 
 RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
     --mount=type=tmpfs,dst=/tmp \
     --mount=type=bind,from=akmods_zfs,source=/kernel-rpms,dst=/tmp/kernel-rpms \
     /ctx/01-common.sh && \
     ostree container commit
 
 RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/02-docker.sh && \
     ostree container commit
 
 RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/10-base-packages.sh && \
     ostree container commit
 
 RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
     --mount=type=tmpfs,dst=/tmp \
     --mount=type=bind,from=akmods_zfs,src=/rpms,dst=/tmp/akmods-zfs-rpms \
     /ctx/11-base-zfs.sh && \
@@ -39,8 +43,9 @@ RUN --mount=type=cache,dst=/var/cache \
 
 #ifdef NVIDIA
 RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
     --mount=type=tmpfs,dst=/tmp \
     --mount=type=bind,from=akmods_nvidia,src=/rpms,dst=/tmp/akmods-nv-rpms \
     /ctx/12-base-nvidia.sh && \
@@ -49,15 +54,17 @@ RUN --mount=type=cache,dst=/var/cache \
 
 #if defined(NAS) || defined(HCI)
 RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/20-nas-packages.sh && \
-    ostree container cleanup
+    ostree container commit
 
 RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/21-nas-zfs.sh && \
     ostree container commit
@@ -65,16 +72,18 @@ RUN --mount=type=cache,dst=/var/cache \
 
 #ifdef HCI
 RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/30-virt-packages.sh && \
     ostree container commit
 #endif /* HCI */
 
 RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=tmpfs,dst=/var/log \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/98-cleanup.sh && \
     ostree container commit

@@ -9,3 +9,8 @@ dnf -y install --setopt=install_weak_deps=False \
     libvirt-client \
     libvirt-daemon-kvm \
     virt-install
+
+### sysusers.d for libvirtdbus
+cat >/usr/lib/sysusers.d/libvirt-dbus.conf <<'EOF'
+u libvirtdbus - 'Libvirt D-Bus bridge' - -
+EOF
