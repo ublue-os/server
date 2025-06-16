@@ -26,6 +26,7 @@ dnf -y upgrade epel-release
 dnf -y install --setopt=install_weak_deps=False \
   audit \
   git-core \
+  intel-compute-runtime \
   ipcalc \
   iscsi-initiator-utils \
   python3-dnf-plugin-versionlock \
