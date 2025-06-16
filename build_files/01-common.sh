@@ -30,3 +30,20 @@ dnf -y install --setopt=install_weak_deps=False \
   iscsi-initiator-utils \
   rsync \
   ssh-key-dir
+
+# Kernel Swap to Kernel signed with our MOK
+pushd /tmp/kernel-rpms
+CACHED_VERSION=$(find kernel-*.rpm | grep -P "kernel-\d+\.\d+\.\d+-\d+$(rpm -E %{dist})" | sed -E 's/kernel-//;s/\.rpm//')
+popd
+KERNEL_VERSION="$(rpm -q 'kernel' | sed -E 's/kernel-//')"
+
+if [[ "${CACHED_VERSION}" == "$KERNEL_VERSION" ]]; then
+  dnf -y --allowerasing install /tmp/kernel-rpms/kernel-core-"$CACHED_VERSION".rpm
+else
+  dnf -y --allowerasing install \
+    /tmp/kernel-rpms/kernel-"$CACHED_VERSION".rpm \
+    /tmp/kernel-rpms/kernel-core-"$CACHED_VERSION".rpm \
+    /tmp/kernel-rpms/kernel-modules-"$CACHED_VERSION".rpm \
+    /tmp/kernel-rpms/kernel-modules-core-"$CACHED_VERSION".rpm \
+    /tmp/kernel-rpms/kernel-modules-extra-"$CACHED_VERSION".rpm
+fi
