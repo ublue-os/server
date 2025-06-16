@@ -1,23 +1,22 @@
-# a Universal Blue server project - WIP
+# Cayo: a Universal Blue server project
 
 Welcome to our work in progress!
 
 ## Overview
 
-This will be a server image similar to [uCore](https://github.com/ublue-os/ucore).
+This will be a server image similar to [uCore](https://github.com/ublue-os/ucore) but based on CentOS bootc.
 
 Similarities to uCore:
 
 - bootc/rpm-ostree "immutable" rootfs (CoreOS itself is now built on bootc)
 - three basic offerings will remain: "light-ish", "NAS" and "HCI"(NAS+virt)
 - opinionated, likely including all the same common tools we had in uCore
-- there will be auto-update capabilities
+- auto-update capabilities
 
 Differences from uCore:
 
-- built on bootc not CoreOS proper
+- built on bootc not CoreOS
 - built on EL (Enterprise Linux, eg CentOS) not Fedora
-- simpler image matrix: ZFS will be included on all images, NVIDIA will remain an option
 - installation via [existing bootc install methods](https://docs.fedoraproject.org/en-US/bootc/bare-metal/) rather than coreos-install+butane/ignition
 
 The most noticeable difference for most users will be:
@@ -54,6 +53,8 @@ The CPP conditional logic in the Containerfile provides several benefits.
 - we regain the typical "podman build" behavior of caching each successful layer of an image build, which greatly improves speed of development
 
 
-## Naming
+## About the Name
 
-"server" is a placeholder for now as we work on a project name.
+"Cayo" (KYE-oh) comes from "key" or "reef" in Spanish—think a solid foundation and unlocking potential.
+
+Conceptually, the "key" unlocks possibilities, and hints at islands that open up new horizons. "Reef" evokes a resilient, interconnected chain—strong and foundational, like a reef hosting diverse organisms. This fits the idea of a server hosting many services, which Cayo achieves through the stability and strength of an Enterprise Linux base hosting containerized applications.
