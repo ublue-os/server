@@ -168,6 +168,7 @@ build-container $image="" $variant="" $flavor="" $version="":
     {{ default-inputs }}
     {{ just }} check-valid-image $image $variant $flavor $version
     {{ get-names }}
+    {{ pull-retry }}
     # Verify Source: do after upstream starts signing images
 
     # Tags
@@ -201,11 +202,24 @@ build-container $image="" $variant="" $flavor="" $version="":
         "--cap-add=all"
         "--device" "/dev/fuse"
         "--cpp-flag=-DSOURCE_IMAGE=$source_image"
+        "--cpp-flag=-DZFS=$image_registry/akmods-zfs:centos-stream$version"
     )
     for FLAG in $image_cpp_flags; do
-        BUILD_ARGS+=("--cpp-flag=-D$FLAG=1")
+        case "${FLAG:-}" in
+        "NVIDIA")
+            BUILD_ARGS+=("--cpp-flag=-D$FLAG=$image_registry/akmods-nvidia:centos-stream$version")
+            ;;
+        *)
+            BUILD_ARGS+=("--cpp-flag=-D$FLAG=1")
+            ;;
+        esac
     done
 
+    # Pull Images with retry
+    pull-retry "$source_image"
+    pull-retry "$image_registry/akmods-zfs:centos-stream$version"
+    {{ if flavor == 'nvidia' { 'pull-retry "$image_registry/akmods-nvidia:centos-stream$version"
+' } else { '' } }}
     # Build Image
     {{ podman }} build -f Containerfile.in "${BUILD_ARGS[@]}" "${LABELS[@]}" "${TAGS[@]}" .
 
@@ -216,7 +230,6 @@ clean $image $variant $flavor $version $registry="":
     set -xeou pipefail
 
     : "${registry:=localhost}"
-    {{ default-inputs }}
     {{ get-names }}
     declare -a CLEAN="($({{ podman }} image list $registry/$image_name --noheading --format 'table {{{{ .ID }}' | uniq))"
     if [[ -n "${CLEAN[@]:-}" ]]; then
