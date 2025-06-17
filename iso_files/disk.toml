@@ -1,0 +1,7 @@
+[[customizations.user]]
+name = "root"
+key = "<SSHPUBKEY>"
+
+[[customizations.filesystem]]
+mountpoint = "/"
+minsize = "10 GiB"
