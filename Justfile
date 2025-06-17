@@ -7,7 +7,7 @@ image := "server"
 variant := "base"
 version := "10"
 flavor := "main"
-rechunker := `yq '.images.rechunker.image' images.yaml` + "@" + `yq '.images.rechunker.digest' images.yaml`
+rechunker := `yq '.images.rechunker.source' images.yaml`
 
 _default:
     @just --list --unsorted
@@ -257,6 +257,8 @@ rechunk $image="" $variant="" $flavor="" $version="":
     CREF=$({{ podman }} create localhost/$image_name:$version bash)
     OUT_NAME="$image_name.tar"
     MOUNT="$({{ podman }} mount $CREF)"
+
+    pull-retry "{{ rechunker }}"
 
     {{ podman }} run --rm \
         --security-opt label=disable \
