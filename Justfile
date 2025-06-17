@@ -231,18 +231,18 @@ build-container $image="" $variant="" $flavor="" $version="":
 # Rechunk Image
 rechunk $image="" $variant="" $flavor="" $version="":
     #!/usr/bin/env bash
-    {{ `mkdir -p build` }}
     {{ default-inputs }}
     {{ just }} check-valid-image $image $variant $flavor $version
     {{ get-names }}
     {{ pull-retry }}
+    mkdir -p build/$image_name
     if [[ "$(id -u)" != 0 ]]; then
         {{ podman }} unshare -- {{ just }} rechunk $image $variant $flavor $version
         exit $?
     fi
 
+    cd build/$image_name
     set -xeou pipefail
-    cd build
 
     # Labels
     VERSION="$({{ podman }} inspect localhost/$image_name:$version --format '{{{{ index .Config.Labels "org.opencontainers.image.version" }}')"
@@ -298,7 +298,7 @@ rechunk $image="" $variant="" $flavor="" $version="":
         {{ rechunker }} \
         /sources/rechunk/3_chunk.sh
     {{ podman }} volume rm cache_ostree
-    {{ if env("CI", "") != "" { 'mv $image_name.tar ../$image_name.tar' } else { '' } }}
+    {{ if env("CI", "") != "" { 'mv $image_name.tar ' + justfile_dir()/'$image_name.tar' } else { '' } }}
 
 # Removes all Tags of an image from container storage.
 [group('Utility')]
