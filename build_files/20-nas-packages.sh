@@ -29,3 +29,23 @@ dnf -y copr disable ublue-os/staging
 ### NOTE: ARM support will require use of proper arch rather than hard coding
 /ctx/github-release-install.sh rclone/rclone "linux-amd64"
 /ctx/github-release-install.sh trapexit/mergerfs "el${RELEASE}.x86_64"
+
+cat > /usr/lib/tmpfiles.d/pcp-cayo.conf<<'EOF'
+d /var/lib/pcp/config/pmda 0775 pcp pcp -
+d /var/lib/pcp/config/pmie 0775 pcp pcp -
+d /var/lib/pcp/config/pmlogger 0775 pcp pcp -
+d /var/lib/pcp/tmp 0775 pcp pcp -
+d /var/lib/pcp/tmp/bash 0775 pcp pcp -
+d /var/lib/pcp/tmp/json 0775 pcp pcp -
+d /var/lib/pcp/tmp/mmv 0775 pcp pcp -
+d /var/lib/pcp/tmp/pmie 0775 pcp pcp -
+d /var/lib/pcp/tmp/pmlogger 0775 pcp pcp -
+d /var/lib/pcp/tmp/pmproxy 0775 pcp pcp -
+d /var/log/pcp 0775 pcp pcp -
+d /var/log/pcp/pmcd 0775 pcp pcp -
+d /var/log/pcp/pmfind 0775 pcp pcp -
+d /var/log/pcp/pmie 0775 pcp pcp -
+d /var/log/pcp/pmlogger 0775 pcp pcp -
+d /var/log/pcp/pmproxy 0775 pcp pcp -
+d /var/log/pcp/sa 0775 pcp pcp -
+EOF
