@@ -7,7 +7,7 @@ image := "server"
 variant := "base"
 version := "10"
 flavor := "main"
-rechunker := `yq '.images.rechunker.source' images.yaml`
+rechunker := shell("yq '.images.rechunker.source' images.yaml")
 
 _default:
     @just --list --unsorted
