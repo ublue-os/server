@@ -3,7 +3,7 @@ set unstable := true
 just := just_executable()
 podman := require('podman')
 
-image := "server"
+image := "cayo"
 variant := "base"
 version := "10"
 flavor := "main"

@@ -3,60 +3,60 @@ centos-10: &centos-10
   # TODO: Implement a Renovate Regex
   source: quay.io/centos-bootc/centos-bootc:c10s
   version: 10
-server: &server
+cayo: &cayo
   org: ublue-os
   registry: ghcr.io
   repo: cayo
   cppFlags: []
-server-base: &server-base
-  <<: *server
-  name: server
-server-nas: &server-nas
-  <<: *server
-  name: server-nas
+cayo-base: &cayo-base
+  <<: *cayo
+  name: cayo
+cayo-nas: &cayo-nas
+  <<: *cayo
+  name: cayo-nas
   cppFlags: [ NAS ]
-server-hci: &server-hci
-  <<: *server
-  name: server-hci
+cayo-hci: &cayo-hci
+  <<: *cayo
+  name: cayo-hci
   cppFlags: [ HCI ]
 
 images:
-  server-base-main-10:
+  cayo-base-main-10:
     !!merge <<: 
       - *centos-10
-      - *server-base
-    description: "A bootc lightweight server image with ZFS included"
-  server-nas-main-10:
+      - *cayo-base
+    description: "A lightweight bootc server image with ZFS included"
+  cayo-nas-main-10:
     !!merge <<: 
       - *centos-10
-      - *server-nas
+      - *cayo-nas
     description: "A bootc NAS image with ZFS included"
-  server-hci-main-10:
+  cayo-hci-main-10:
     !!merge <<: 
       - *centos-10
-      - *server-hci
+      - *cayo-hci
     description: "A bootc Hyper-Converged Infrastructure image with ZFS included"
-  server-base-nvidia-10:
+  cayo-base-nvidia-10:
     !!merge <<: 
       - *centos-10
-      - *server-base
+      - *cayo-base
     cppFlags: [ NVIDIA ]
-    description: "A bootc lightweight server image with ZFS and NVIDIA included"
-    name: server-nvidia
-  server-nas-nvidia-10:
+    description: "A bootc lightweight cayo image with ZFS and NVIDIA included"
+    name: cayo-nvidia
+  cayo-nas-nvidia-10:
     !!merge <<: 
       - *centos-10
-      - *server-nas
+      - *cayo-nas
     cppFlags: [ NAS, NVIDIA ]
     description: "A bootc NAS image with ZFS and NVIDIA included"
-    name: server-nas-nvidia
-  server-hci-nvidia-10:
+    name: cayo-nas-nvidia
+  cayo-hci-nvidia-10:
     !!merge <<: 
       - *centos-10
-      - *server-hci
+      - *cayo-hci
     cppFlags: [ HCI, NVIDIA ]
     description: "A bootc Hyper-Converged Infrastructure image with ZFS and NVIDIA included"
-    name: server-hci-nvidia
+    name: cayo-hci-nvidia
   rechunker:
     # TODO: Add Renovate Regex configuration
     source: ghcr.io/hhd-dev/rechunk:v1.2.2@sha256:e799d89f9a9965b5b0e89941a9fc6eaab62e9d2d73a0bfb92e6a495be0706907

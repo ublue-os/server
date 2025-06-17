@@ -5,7 +5,7 @@ COPY build_files /
 FROM NVIDIA as akmods_nvidia
 #endif /* NVIDIA */
 FROM ZFS as akmods_zfs
-FROM SOURCE_IMAGE as server
+FROM SOURCE_IMAGE as cayo
 
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
