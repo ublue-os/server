@@ -349,30 +349,32 @@ push-to-registry $image $variant $flavor $version $destination="" $transport="":
         done
 
 # Podmaon Machine Init
-@init-machine:
+init-machine:
+    #!/usr/bin/env bash
+    set -ou pipefail
     {{ podman }} machine init \
         --rootful \
         --memory $(( 1024 * 8 )) \
         --volume "{{ justfile_dir() }}:{{ justfile_dir() }}" \
-        --volume "{{ env('HOME') }}:{{ env('HOME') }}" 2>build/error.log; \
-    ec=$?; \
-    if [ $ec = 125 ] && grep -q 'VM already exists' build/error.log; then \
-        exit 0; \
-    else \
-        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat build/error.log | sed -E 's/Error:\s//')" >&2; \
-    fi; \
-    exit $ec
+        --volume "{{ env('HOME') }}:{{ env('HOME') }}" 2>build/error.log
+    ec=$?
+    if [ $ec = 125 ] && ! grep -q 'VM already exists' build/error.log; then 
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat build/error.log | sed -E 's/Error:\s//')" >&2
+        exit $ec
+    fi
+    exit 0
 
 # Start Podman Machine
-@start-machine: init-machine
-    {{ podman }} machine start 2>build/error.log; \
-    ec=$?; \
-    if [ $ec = 125 ] && grep -q 'already running' build/error.log; then \
-        exit 0; \
-    else \
-        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat build/error.log | sed -E 's/Error:\s//')" >&2; \
-    fi; \
-    exit $ec
+start-machine: init-machine
+    #!/usr/bin/env bash
+    set -ou pipefail
+    {{ podman }} machine start 2>build/error.log
+    ec=$?
+    if [ $ec = 125 ] && ! grep -q 'already running' build/error.log; then
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat build/error.log | sed -E 's/Error:\s//')" >&2
+        exit $ec
+    fi
+    exit 0
 
 build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-machine
     #!/usr/bin/env bash
@@ -388,8 +390,10 @@ build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-mach
     sed -i "s/<SSHPUBKEY>/$(cat {{ PUBKEY }})/" build/$image_name/disk.toml
 
     # Load image into rootful podman-machine
-    {{ podman }} image exists $registry/$image_name:$version ||
-        { echo "{{ style('error') }}Error:{{ NORMAL }} Image \"$registry/$image_name:$version\" not in image-store" >&2; exit 1 ; }
+    if ! {{ podman }} image exists $registry/$image_name:$version; then
+        echo "{{ style('error') }}Error:{{ NORMAL }} Image \"$registry/$image_name:$version\" not in image-store" >&2
+        exit 1
+    fi
     {{ podman-remote }} image exists $registry/$image_name:$version ||
         {{ podman }} image scp $registry/$image_name:$version podman-machine-default-root::
     
@@ -407,7 +411,7 @@ build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-mach
         -v ./build/$image_name:/output \
         -v /var/lib/containers/storage:/var/lib/containers/storage \
         quay.io/centos-bootc/bootc-image-builder:latest \
-        --progress verbose \
+        {{ if env('CI', '') == '' { '--progress verbose' } else { '--progress terminal'} }} \
         --type qcow2 \
         --use-librepo=True \
         --rootfs xfs \
@@ -440,3 +444,4 @@ run-disk $image="" $variant="" $flavor="" $version="" $registry="":
         exit $?
     fi
     macadam ssh -- cat /etc/os-release
+    macadam ssh -- systemctl status
