@@ -2,12 +2,15 @@
 set -xeuo pipefail
 
 # See https://github.com/CentOS/centos-bootc/issues/191
-mkdir -m 0700 -p /var/roothome /var/opt
+#shellcheck disable=SC2174
+mkdir -m 0700 -p /var/roothome
 
 # make /usr/local and /opt writable
-mkdir -m 0755 -p /var/opt /var/usrlocal
-ln -sf /var/opt /opt
-ln -sf /var/usrlocal /usr/local
+mkdir -p /var/{opt,usrlocal}
+#shellcheck disable=SC2114
+rm -rf /opt /usr/local
+ln -sf var/opt /opt
+ln -sf ../var/usrlocal /usr/local
 
 # remove subscription manager
 dnf -y remove \
