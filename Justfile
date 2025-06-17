@@ -7,6 +7,7 @@ image := "server"
 variant := "base"
 version := "10"
 flavor := "main"
+rechunker := shell("yq '.images.rechunker.source' images.yaml")
 
 _default:
     @just --list --unsorted
@@ -223,16 +224,89 @@ build-container $image="" $variant="" $flavor="" $version="":
     # Pull Images with retry
     pull-retry "$source_image"
     pull-retry "$image_registry/akmods-zfs:centos-stream$version"
-    {{ if flavor == 'nvidia' { 'pull-retry "$image_registry/akmods-nvidia:centos-stream$version"
-' } else { '' } }}
+    {{ if flavor == 'nvidia' { 'pull-retry "$image_registry/akmods-nvidia:centos-stream$version"' } else { '' } }}
     # Build Image
     {{ podman }} build -f Containerfile.in "${BUILD_ARGS[@]}" "${LABELS[@]}" "${TAGS[@]}" .
+
+# Rechunk Image
+rechunk $image="" $variant="" $flavor="" $version="":
+    #!/usr/bin/env bash
+    {{ default-inputs }}
+    {{ just }} check-valid-image $image $variant $flavor $version
+    {{ get-names }}
+    {{ pull-retry }}
+    mkdir -p build/$image_name
+    if [[ "$(id -u)" != 0 ]]; then
+        {{ podman }} unshare -- {{ just }} rechunk $image $variant $flavor $version
+        exit $?
+    fi
+
+    cd build/$image_name
+    set -xeou pipefail
+
+    # Labels
+    VERSION="$({{ podman }} inspect localhost/$image_name:$version --format '{{{{ index .Config.Labels "org.opencontainers.image.version" }}')"
+    #KERNEL_VERSION= TODO may need to inspect the container contents for this
+    LABELS="
+        org.opencontainers.image.title=$image_name
+        org.opencontainers.image.version=${VERSION}
+        org.opencontainers.image.description=$image_description
+        io.artifacthub.package.readme-url=https://raw.githubusercontent.com/$image_registry/$image_repo/main/README.md
+        io.artifacthub.package.logo-url=https://avatars.githubusercontent.com/u/120078124?s=200&v=4
+    "
+    CREF=$({{ podman }} create localhost/$image_name:$version bash)
+    OUT_NAME="$image_name.tar"
+    MOUNT="$({{ podman }} mount $CREF)"
+
+    pull-retry "{{ rechunker }}"
+
+    {{ podman }} run --rm \
+        --security-opt label=disable \
+        --volume "$MOUNT":/var/tree \
+        --env TREE=/var/tree \
+        --user 0:0 \
+        {{ rechunker }} \
+        /sources/rechunk/1_prune.sh
+
+    {{ podman }} run --rm \
+        --security-opt label=disable \
+        --volume "$MOUNT":/var/tree \
+        --volume "cache_ostree:/var/ostree" \
+        --env TREE=/var/tree \
+        --env REPO=/var/ostree/repo \
+        --env RESET_TIMESTAMP=1 \
+        --user 0:0 \
+        {{ rechunker }} \
+        /sources/rechunk/2_create.sh
+
+    {{ podman }} unmount "$CREF"
+    {{ podman }} rm "$CREF"
+    {{ if env("CI", "") != "" { just + ' clean $image $variant $flavor $version localhost' } else { '' } }}
+
+    {{ podman }} run --rm \
+        --security-opt label=disable \
+        --volume "{{ justfile_dir()/"build/$image_name" }}:/workspace" \
+        --volume "{{ justfile_dir() }}:/var/git" \
+        --volume cache_ostree:/var/ostree \
+        --env REPO=/var/ostree/repo \
+        --env PREV_REF="$image_registry/$image_name:$version" \
+        --env LABELS="$LABELS" \
+        --env OUT_NAME="$OUT_NAME" \
+        --env VERSION="$VERSION" \
+        --env VERSION_FN=/workspace/version.txt \
+        --env OUT_REF="oci-archive:$OUT_NAME" \
+        --env GIT_DIR="/var/git" \
+        --user 0:0 \
+        {{ rechunker }} \
+        /sources/rechunk/3_chunk.sh
+    {{ podman }} volume rm cache_ostree
+    {{ if env("CI", "") != "" { 'mv $image_name.tar ' + justfile_dir()/'$image_name.tar' } else { '' } }}
 
 # Removes all Tags of an image from container storage.
 [group('Utility')]
 clean $image $variant $flavor $version $registry="":
     #!/usr/bin/env bash
-    set -xeou pipefail
+    set -eou pipefail
 
     : "${registry:=localhost}"
     {{ get-names }}
