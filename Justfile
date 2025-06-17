@@ -2,12 +2,16 @@ set unstable := true
 
 just := just_executable()
 podman := require('podman')
+podman-remote := which('podman-remote') || podman + ' --remote'
 
 image := "cayo"
 variant := "base"
 version := "10"
 flavor := "main"
+
+# Source Images
 rechunker := shell("yq '.images.rechunker.source' images.yaml")
+bootc-image-builder := shell("yq '.images.bootc-image-builder.source' images.yaml")
 
 _default:
     @just --list --unsorted
@@ -15,6 +19,10 @@ _default:
 podman-info:
     {{ podman }} info
 
+[private]
+PRIVKEY := '~/.local/share/containers/podman/machine/machine'
+[private]
+PUBKEY := PRIVKEY + '.pub'
 [private]
 default-inputs := '
 : ${image:=' + image + '}
@@ -339,3 +347,101 @@ push-to-registry $image $variant $flavor $version $destination="" $transport="":
         for i in {1..5}; do
             {{ podman }} push "localhost/$image_name:$image_version" "$transport$destination/$image_name:$tag" 2>&1 && break || sleep $((5 * i));
         done
+
+# Podmaon Machine Init
+init-machine:
+    #!/usr/bin/env bash
+    set -ou pipefail
+    {{ podman }} machine init \
+        --rootful \
+        --memory $(( 1024 * 8 )) \
+        --volume "{{ justfile_dir() }}:{{ justfile_dir() }}" \
+        --volume "{{ env('HOME') }}:{{ env('HOME') }}" 2>build/error.log
+    ec=$?
+    if [ $ec = 125 ] && ! grep -q 'VM already exists' build/error.log; then 
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat build/error.log | sed -E 's/Error:\s//')" >&2
+        exit $ec
+    fi
+    exit 0
+
+# Start Podman Machine
+start-machine: init-machine
+    #!/usr/bin/env bash
+    set -ou pipefail
+    {{ podman }} machine start 2>build/error.log
+    ec=$?
+    if [ $ec = 125 ] && ! grep -q 'already running' build/error.log; then
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat build/error.log | sed -E 's/Error:\s//')" >&2
+        exit $ec
+    fi
+    exit 0
+
+build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-machine
+    #!/usr/bin/env bash
+    {{ default-inputs }}
+    : "${registry:=localhost}"
+    {{ get-names }}
+    set -eou pipefail
+    # Create Build Dir
+    mkdir -p build/$image_name
+
+    # Process Template
+    cp iso_files/disk.toml build/$image_name/disk.toml
+    sed -i "s/<SSHPUBKEY>/$(cat {{ PUBKEY }})/" build/$image_name/disk.toml
+
+    # Load image into rootful podman-machine
+    if ! {{ podman }} image exists $registry/$image_name:$version; then
+        echo "{{ style('error') }}Error:{{ NORMAL }} Image \"$registry/$image_name:$version\" not in image-store" >&2
+        exit 1
+    fi
+    {{ podman-remote }} image exists $registry/$image_name:$version ||
+        {{ podman }} image scp $registry/$image_name:$version podman-machine-default-root::
+    
+    # Pull Bootc Image Builder
+    {{ podman-remote }} pull --retry 3 {{ bootc-image-builder }}
+    
+    # Build Disk Image
+    {{ podman-remote }} run \
+        --rm \
+        -it \
+        --privileged \
+        --pull=newer \
+        --security-opt label=type:unconfined_t \
+        -v ./build/$image_name/disk.toml:/config.toml:ro \
+        -v ./build/$image_name:/output \
+        -v /var/lib/containers/storage:/var/lib/containers/storage \
+        quay.io/centos-bootc/bootc-image-builder:latest \
+        {{ if env('CI', '') == '' { '--progress verbose' } else { '--progress terminal'} }} \
+        --type qcow2 \
+        --use-librepo=True \
+        --rootfs xfs \
+        $registry/$image_name:$version
+
+run-disk $image="" $variant="" $flavor="" $version="" $registry="":
+    #!/usr/bin/env bash
+    {{ default-inputs }}
+    : "${registry:=localhost}"
+    {{ get-names }}
+    set -ou pipefail
+    if [ ! -f build/$image_name/qcow2/disk.qcow2 ]; then
+        echo "{{ style('error') }}Error:{{ NORMAL }} Disk Image \"$image_name\" not built" >&2 && exit 1
+    fi
+
+    {{ require('macadam') }} init \
+        --ssh-identity-path {{ PRIVKEY }} \
+        --username root 2>build/error.log \
+        build/$image_name/qcow2/disk.qcow2
+    ec=$?
+    if [ $ec = 125 ] && ! grep -q 'VM already exists' build/error.log; then
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat build/error.log | sed -E 's/Error:\s//')" >&2
+    fi
+
+    macadam start 2>build/error.log
+    ec=$?
+    if [ $ec = 125 ] && ! grep -q 'already running' build/error.log; then
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat build/error.log | sed -E 's/Error:\s//')" >&2
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat $XDG_RUNTIME_DIR/macadam/gvproxy.log)" >&2
+        exit $?
+    fi
+    macadam ssh -- cat /etc/os-release
+    macadam ssh -- systemctl status
