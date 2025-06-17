@@ -5,7 +5,7 @@ centos-10: &centos-10
 server: &server
   org: ublue-os
   registry: ghcr.io
-  repo: server
+  repo: cayo
   cppFlags: []
 server-base: &server-base
   <<: *server
@@ -56,3 +56,7 @@ images:
     cppFlags: [ HCI, NVIDIA ]
     description: "A bootc Hyper-Converged Infrastructure image with ZFS and NVIDIA included"
     name: server-hci-nvidia
+  rechunker:
+    image: ghcr.io/hhd-dev/rechunk
+    tag: v1.2.2
+    digest: sha256:e799d89f9a9965b5b0e89941a9fc6eaab62e9d2d73a0bfb92e6a495be0706907
