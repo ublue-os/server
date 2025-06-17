@@ -11,6 +11,9 @@ dnf -y install --setopt=install_weak_deps=False \
     distrobox \
     duperemove \
     hdparm \
+    iwlegacy-firmware \
+    iwlwifi-dvm-firmware \
+    iwlwifi-mvm-firmware \
     pcp-zeroconf \
     samba \
     samba-usershares \
