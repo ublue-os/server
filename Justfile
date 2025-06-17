@@ -285,7 +285,7 @@ rechunk $image="" $variant="" $flavor="" $version="":
 
     {{ podman }} run --rm \
         --security-opt label=disable \
-        --volume "{{ justfile_dir()/"build" }}:/workspace" \
+        --volume "{{ justfile_dir()/"build/$image_name" }}:/workspace" \
         --volume "{{ justfile_dir() }}:/var/git" \
         --volume cache_ostree:/var/ostree \
         --env REPO=/var/ostree/repo \
