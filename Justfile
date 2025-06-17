@@ -349,7 +349,6 @@ push-to-registry $image $variant $flavor $version $destination="" $transport="":
         done
 
 # Podmaon Machine Init
-[no-exit-message]
 @init-machine:
     {{ podman }} machine init \
         --rootful \
@@ -365,7 +364,6 @@ push-to-registry $image $variant $flavor $version $destination="" $transport="":
     exit $ec
 
 # Start Podman Machine
-[no-exit-message]
 @start-machine: init-machine
     {{ podman }} machine start 2>build/error.log; \
     ec=$?; \
@@ -391,7 +389,7 @@ build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-mach
 
     # Load image into rootful podman-machine
     {{ podman }} image exists $registry/$image_name:$version ||
-        echo "{{ style('error') }}Error:{{ NORMAL }} Image \"$registry/$image_name:$version\" not in image-store"
+        { echo "{{ style('error') }}Error:{{ NORMAL }} Image \"$registry/$image_name:$version\" not in image-store" >&2; exit 1 ; }
     {{ podman-remote }} image exists $registry/$image_name:$version ||
         {{ podman }} image scp $registry/$image_name:$version podman-machine-default-root::
     
@@ -414,3 +412,31 @@ build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-mach
         --use-librepo=True \
         --rootfs xfs \
         $registry/$image_name:$version
+
+run-disk $image="" $variant="" $flavor="" $version="" $registry="":
+    #!/usr/bin/env bash
+    {{ default-inputs }}
+    : "${registry:=localhost}"
+    {{ get-names }}
+    set -ou pipefail
+    if [ ! -f build/$image_name/qcow2/disk.qcow2 ]; then
+        echo "{{ style('error') }}Error:{{ NORMAL }} Disk Image \"$image_name\" not built" >&2 && exit 1
+    fi
+
+    {{ require('macadam') }} init \
+        --ssh-identity-path {{ PRIVKEY }} \
+        --username root 2>build/error.log \
+        build/$image_name/qcow2/disk.qcow2
+    ec=$?
+    if [ $ec = 125 ] && ! grep -q 'VM already exists' build/error.log; then
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat build/error.log | sed -E 's/Error:\s//')" >&2
+    fi
+
+    macadam start 2>build/error.log
+    ec=$?
+    if [ $ec = 125 ] && ! grep -q 'already running' build/error.log; then
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat build/error.log | sed -E 's/Error:\s//')" >&2
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat $XDG_RUNTIME_DIR/macadam/gvproxy.log)" >&2
+        exit $?
+    fi
+    macadam ssh -- cat /etc/os-release
