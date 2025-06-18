@@ -29,3 +29,16 @@ dnf -y install --setopt=install_weak_deps=False \
   wireguard-tools
 
 dnf config-manager --set-disabled tailscale-stable
+
+### set variant and url for unique identification
+sed -i 's|^HOME_URL=.*|HOME_URL="https://projectcayo.org"|' /usr/lib/os-release
+echo 'VARIANT="Cayo"' >> /usr/lib/os-release
+echo 'VARIANT_ID="cayo"' >> /usr/lib/os-release
+# if VARIANT ever gets added to CentOS we'll need these instead
+#sed -i 's|^VARIANT=.*|VARIANT="Cayo"|' /usr/lib/os-release
+#sed -i 's|^VARIANT_ID=.*|VARIANT_ID="cayo"|' /usr/lib/os-release
+
+# set pretty name for base image
+SOURCE_VERSION="$(grep ^VERSION_ID= /usr/lib/os-release|cut -f2 -d=|tr -d \")"
+SOURCE_NAME="$(grep ^NAME= /usr/lib/os-release|cut -f2 -d=|tr -d \")"
+sed -i "s|^PRETTY_NAME=.*|PRETTY_NAME=\"Cayo (Version $IMAGE_VERSION / FROM $SOURCE_NAME $SOURCE_VERSION)\"|" /usr/lib/os-release

@@ -7,6 +7,8 @@ FROM NVIDIA as akmods_nvidia
 FROM ZFS as akmods_zfs
 FROM SOURCE_IMAGE as cayo
 
+ARG IMAGE_VERSION
+
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/var/log \

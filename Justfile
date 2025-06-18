@@ -3,7 +3,6 @@ set unstable := true
 just := just_executable()
 podman := require('podman')
 podman-remote := which('podman-remote') || podman + ' --remote'
-
 image := "cayo"
 variant := "base"
 version := "10"
@@ -198,14 +197,17 @@ build-container $image="" $variant="" $flavor="" $version="":
         TAGS+=("--tag" "localhost/$image_name:$tag")
     done
 
+    # Pull akmods-zfs image with retry as we always need it for kernel and ZFS
+    pull-retry "$image_registry/akmods-zfs:centos-stream$version"
+
     # Labels
-    VERSION="$image_version.$TIMESTAMP"
-    #KERNEL_VERSION= TODO may need to inspect the container contents for this
+    IMAGE_VERSION="$image_version.$TIMESTAMP"
+    KERNEL_VERSION="$(skopeo inspect containers-storage:$image_registry/akmods-zfs:centos-stream$version | jq -r '.Labels["ostree.linux"]')"
     LABELS=(
         "--label" "org.opencontainers.image.title=$image_name"
-        "--label" "org.opencontainers.image.version=${VERSION}"
+        "--label" "org.opencontainers.image.version=${IMAGE_VERSION}"
         "--label" "org.opencontainers.image.description=$image_description"
-        #"--label" "ostree.linux=${KERNEL_VERSION}"
+        "--label" "ostree.linux=${KERNEL_VERSION}"
         "--label" "io.artifacthub.package.readme-url=https://raw.githubusercontent.com/$image_registry/$image_repo/main/README.md"
         "--label" "io.artifacthub.package.logo-url=https://avatars.githubusercontent.com/u/120078124?s=200&v=4"
     )
@@ -215,6 +217,7 @@ build-container $image="" $variant="" $flavor="" $version="":
         "--security-opt=label=disable"
         "--cap-add=all"
         "--device" "/dev/fuse"
+        "--build-arg=IMAGE_VERSION=$IMAGE_VERSION"
         "--cpp-flag=-DSOURCE_IMAGE=$source_image"
         "--cpp-flag=-DZFS=$image_registry/akmods-zfs:centos-stream$version"
     )
@@ -229,10 +232,10 @@ build-container $image="" $variant="" $flavor="" $version="":
         esac
     done
 
-    # Pull Images with retry
+    # Pull source and akmods images with retry (akmods-zfs pulled above)
     pull-retry "$source_image"
-    pull-retry "$image_registry/akmods-zfs:centos-stream$version"
     {{ if flavor == 'nvidia' { 'pull-retry "$image_registry/akmods-nvidia:centos-stream$version"' } else { '' } }}
+
     # Build Image
     {{ podman }} build -f Containerfile.in "${BUILD_ARGS[@]}" "${LABELS[@]}" "${TAGS[@]}" .
 
@@ -293,7 +296,7 @@ rechunk $image="" $variant="" $flavor="" $version="":
 
     {{ podman }} run --rm \
         --security-opt label=disable \
-        --volume "{{ justfile_dir()/"build/$image_name" }}:/workspace" \
+        --volume "{{ justfile_dir() / "build/$image_name" }}:/workspace" \
         --volume "{{ justfile_dir() }}:/var/git" \
         --volume cache_ostree:/var/ostree \
         --env REPO=/var/ostree/repo \
@@ -308,7 +311,7 @@ rechunk $image="" $variant="" $flavor="" $version="":
         {{ rechunker }} \
         /sources/rechunk/3_chunk.sh
     {{ podman }} volume rm cache_ostree
-    {{ if env("CI", "") != "" { 'mv $image_name.tar ' + justfile_dir()/'$image_name.tar' } else { '' } }}
+    {{ if env("CI", "") != "" { 'mv $image_name.tar ' + justfile_dir() / '$image_name.tar' } else { '' } }}
 
 # Removes all Tags of an image from container storage.
 [group('Utility')]
