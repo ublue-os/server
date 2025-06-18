@@ -529,14 +529,16 @@ run-iso $image="" $variant="" $flavor="" $version="":
 
     # Set up the arguments for running the VM
     run_args=()
-    run_args+=(--rm --privileged)
+    run_args+=(--rm)
     run_args+=(--publish "127.0.0.1:${port}:8006")
-    run_args+=(--env "CPU_CORES=$cpu_cores)
+    run_args+=(--env "CPU_CORES=$cpu_cores")
     run_args+=(--env "RAM_SIZE=${ram_size}M")
-    run_args+=(--env "DISK_SIZE=64G")
+    run_args+=(--env "DISK_SIZE=20G")
     run_args+=(--env "TPM=Y")
     run_args+=(--env "BOOT_MODE=windows_secure")
     run_args+=(--device=/dev/kvm)
+    run_args+=(--device=/dev/net/tun)
+    run_args+=(--cap-add NET_ADMIN)
     run_args+=(--volume "./build/$image_name/bootiso/install.iso":"/boot.iso")
 
     # Run the VM and open the browser to connect
