@@ -92,6 +92,11 @@ while [[ -z "${YAMLFMT:-}" || "${YAMLFMT:-}" == "null" ]]; do
 done
 curl --retry 3 -L# "${YAMLFMT}" | tar -xz -C /usr/local/bin/
 
+# macadam
+curl --retry 3 -L#o "/usr/local/bin/macadam" "https://github.com/crc-org/macadam/releases/latest/download/macadam-linux-amd64"
+chmod +x /usr/local/bin/macadam
+macadam completion bash > /etc/bash_completion.d/macadam.sh
+
 tee -a /etc/bashrc >/dev/null <<'EOF'
 # Pretty Colors
 alias ll='ls -la'
