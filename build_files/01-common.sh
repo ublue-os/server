@@ -94,3 +94,28 @@ DaO51gzKIn1Aumx5L76B64rp7LVWRpnwGPs=
 -----END CERTIFICATE-----
 EOF
 openssl x509 -inform pem -in /etc/pki/akmods/certs/akmods-ublue.pem -out /etc/pki/akmods/certs/akmods-ublue.der
+
+### Configure Updates
+sed -i 's|^ExecStart=.*|ExecStart=/usr/bin/bootc update --quiet|' /usr/lib/systemd/system/bootc-fetch-apply-updates.service
+sed -i 's|^OnUnitInactiveSec=.*|OnUnitInactiveSec=7d\nPersistent=true|' /usr/lib/systemd/system/bootc-fetch-apply-updates.timer
+sed -i 's|#AutomaticUpdatePolicy.*|AutomaticUpdatePolicy=stage|' /etc/rpm-ostreed.conf
+sed -i 's|#LockLayering.*|LockLayering=true|' /etc/rpm-ostreed.conf
+
+### Zram Generator
+cat >/usr/lib/systemd/zram-generator.conf<<'EOF'
+# This config file enables a /dev/zram0 device with the default settings:
+# — size — same as available RAM or 8GB, whichever is less
+# — compression — most likely lzo-rle
+#
+# To disable create empty /etc/systemd/zram-generator.conf file
+[zram0]
+zram-size = min(ram, 8192)
+EOF
+
+### TMPFILES.D
+
+# Create rpm-state
+mkdir -p /var/lib/rpm-state
+cat > /usr/lib/tmpfiles.d/cayo-rpm-state.conf<<'EOF'
+d /var/lib/rpm-state - - - -
+EOF
