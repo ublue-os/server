@@ -29,3 +29,8 @@ dnf -y copr disable ublue-os/staging
 ### NOTE: ARM support will require use of proper arch rather than hard coding
 /ctx/github-release-install.sh rclone/rclone "linux-amd64"
 /ctx/github-release-install.sh trapexit/mergerfs "el${RELEASE}.x86_64"
+
+# set pretty name for NAS image
+SOURCE_VERSION="$(grep ^VERSION_ID= /usr/lib/os-release|cut -f2 -d=|tr -d \")"
+SOURCE_NAME="$(grep ^NAME= /usr/lib/os-release|cut -f2 -d=|tr -d \")"
+sed -i "s|^PRETTY_NAME=.*|PRETTY_NAME=\"Cayo NAS (Version $IMAGE_VERSION / FROM $SOURCE_NAME $SOURCE_VERSION)\"|" /usr/lib/os-release
