@@ -36,7 +36,7 @@ SOURCE_NAME="$(grep ^NAME= /usr/lib/os-release|cut -f2 -d=|tr -d \")"
 sed -i "s|^PRETTY_NAME=.*|PRETTY_NAME=\"Cayo NAS (Version $IMAGE_VERSION / FROM $SOURCE_NAME $SOURCE_VERSION)\"|" /usr/lib/os-release
 
 # Tmpfiles fix for pcp
-cat > /usr/lib/tmpfiles.d/pcp-cayo.conf<<'EOF'
+cat > /usr/lib/tmpfiles.d/cayo-pcp.conf<<'EOF'
 d /var/lib/pcp/config/pmda 0775 pcp pcp -
 d /var/lib/pcp/config/pmie 0775 pcp pcp -
 d /var/lib/pcp/config/pmlogger 0775 pcp pcp -
@@ -54,4 +54,16 @@ d /var/log/pcp/pmie 0775 pcp pcp -
 d /var/log/pcp/pmlogger 0775 pcp pcp -
 d /var/log/pcp/pmproxy 0775 pcp pcp -
 d /var/log/pcp/sa 0775 pcp pcp -
+EOF
+
+# Tmpfiles fix for duperemove
+cat > /usr/lib/tmpfiles.d/cayo-duperemove.conf<<'EOF'
+d /var/lib/duperemove - - - -
+EOF
+
+# Duperemove configuration
+cat >/etc/default/duperemove<<'EOF'
+HashDir=/var/lib/duperemove
+# Additional options for duperemove binary
+OPTIONS="--skip-zeroes --hash=xxhash"
 EOF

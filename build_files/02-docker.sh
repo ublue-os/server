@@ -20,8 +20,9 @@ echo "net.ipv4.ip_forward = 1" >/usr/lib/sysctl.d/docker-ce.conf
 
 dnf config-manager --set-disabled docker-ce-stable
 
-# Disable the docker service by default
-systemctl disable docker.service
+# Disable the docker socket by default
+sed -i 's/enable docker/disable docker/' /usr/lib/systemd/system-preset/90-default.preset
+systemctl preset docker.service docker.socket
 
 # sysusers.d for docker
 cat >/usr/lib/sysusers.d/docker.conf <<'EOF'
