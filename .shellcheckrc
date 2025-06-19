@@ -1,2 +1,5 @@
+# Shell - we are only using bash
 shell=bash
+
+# Disable Warnings for Shebang line
 disable=SC2148,SC1113
