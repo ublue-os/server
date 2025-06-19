@@ -26,7 +26,7 @@ images:
     !!merge <<: 
       - *centos-10
       - *cayo-hci
-    description: "A bootc Hyper-Converged Infrastructure server image with ZFS included"
+    description: "A bootc Hyper-Converged Infrastructure image with ZFS included"
   cayo-base-nvidia-10:
     !!merge <<: 
       - *centos-10
@@ -39,7 +39,7 @@ images:
       - *centos-10
       - *cayo-hci
     cppFlags: [ HCI, NVIDIA ]
-    description: "A bootc Hyper-Converged Infrastructure server image with ZFS and NVIDIA included"
+    description: "A bootc Hyper-Converged Infrastructure image with ZFS and NVIDIA included"
     name: cayo-hci-nvidia
   rechunker:
     # TODO: Add Renovate Regex configuration
