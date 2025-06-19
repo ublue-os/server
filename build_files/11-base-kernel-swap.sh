@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
+# /*
+#shellcheck disable=SC1083
+# */
 
 set -eoux pipefail
 
+# /*
 ### Kernel Swap to Kernel signed with our MOK
+# */
 
 pushd /tmp/kernel-rpms
-#shellcheck disable=SC1083
 CACHED_VERSION=$(find kernel-*.rpm | grep -P "kernel-\d+\.\d+\.\d+-\d+$(rpm -E %{dist})" | sed -E 's/kernel-//;s/\.rpm//')
 popd
 KERNEL_VERSION="$(rpm -q 'kernel' | sed -E 's/kernel-//')"
@@ -21,5 +25,7 @@ else
     /tmp/kernel-rpms/kernel-modules-extra-"$CACHED_VERSION".rpm
 fi
 
+# /*
 ### Version Lock kernel pacakges
+# */
 dnf versionlock add kernel kernel-core kernel-modules kernel-modules-core kernel-modules-extra

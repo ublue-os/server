@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 set -xeuo pipefail
 
+# /*
 ### install base server packages
+# */
 RELEASE="$(rpm -E %centos)"
 
+# /*
 ### add ublue-os specific packages
+# */
 dnf -y copr enable ublue-os/packages
 dnf -y install ublue-os-signing
 mv /etc/containers/policy.json /etc/containers/policy.json-upstream
@@ -12,7 +16,9 @@ mv /usr/etc/containers/policy.json /etc/containers/
 rm -fr /usr/etc
 dnf -y copr disable ublue-os/packages
 
+# /*
 ### server base packages which are mostly what we added in ucore-minimal
+# */
 dnf config-manager --add-repo https://pkgs.tailscale.com/stable/centos/9/tailscale.repo
 
 dnf -y install --setopt=install_weak_deps=False \
@@ -47,10 +53,12 @@ dnf config-manager --set-disabled tailscale-stable
 
 dnf -y copr enable ublue-os/staging
 dnf -y install snapraid
-# dnf -y install sanoid
+# /* dnf -y install sanoid # Currently missing dependencies */
 dnf -y copr disable ublue-os/staging
 
+# /*
 ### install packages direct from github
 ### NOTE: ARM support will require use of proper arch rather than hard coding
+# */
 /run/build_files/github-release-install.sh rclone/rclone "linux-amd64"
 /run/build_files/github-release-install.sh trapexit/mergerfs "el${RELEASE}.$(uname -m)"

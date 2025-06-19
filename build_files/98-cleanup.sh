@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -xeuo pipefail
 
+# /*
 # Ensure Initramfs is generated
+# */
 KERNEL_VERSION="$(rpm -q --queryformat="%{EVR}.%{ARCH}" kernel-core)"
 
 export DRACUT_NO_XATTR=1
@@ -9,7 +11,9 @@ export DRACUT_NO_XATTR=1
 
 chmod 0600 /lib/modules/"$KERNEL_VERSION"/initramfs.img
 
+# /*
 # Ensure only one kernel/initramfs is present
+# */
 KERNEL_VERSION="$(rpm -q kernel-core --queryformat '%{EVR}.%{ARCH}')"
 
 kernel_dirs=("$(ls -1 /usr/lib/modules)")
@@ -23,5 +27,7 @@ if [[ ${#kernel_dirs[@]} -gt 1 ]]; then
     done
 fi
 
+# /*
 # Remove Versionlocks (Needs dnf cache to run)
+# */
 dnf versionlock clear

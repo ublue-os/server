@@ -2,21 +2,29 @@
 
 set -eoux pipefail
 
+# /*
 ### OS Release
 # set variant and url for unique identification
+# */
 sed -i 's|^HOME_URL=.*|HOME_URL="https://projectcayo.org"|' /usr/lib/os-release
 echo 'VARIANT="Cayo"' >> /usr/lib/os-release
 echo 'VARIANT_ID="cayo"' >> /usr/lib/os-release
+# /*
 # if VARIANT ever gets added to CentOS we'll need these instead
 #sed -i 's|^VARIANT=.*|VARIANT="Cayo"|' /usr/lib/os-release
 #sed -i 's|^VARIANT_ID=.*|VARIANT_ID="cayo"|' /usr/lib/os-release
+# */
 
+# /*
 # set pretty name for base image
+# */
 SOURCE_VERSION="$(grep ^VERSION_ID= /usr/lib/os-release|cut -f2 -d=|tr -d \")"
 SOURCE_NAME="$(grep ^NAME= /usr/lib/os-release|cut -f2 -d=|tr -d \")"
 sed -i "s|^PRETTY_NAME=.*|PRETTY_NAME=\"Cayo (Version $IMAGE_VERSION / FROM $SOURCE_NAME $SOURCE_VERSION)\"|" /usr/lib/os-release
 
+# /*
 # AKMODS certificate
+# */
 mkdir -p /etc/pki/akmods/certs
 cat >/etc/pki/akmods/certs/akmods-ublue.pem <<'EOF'
 -----BEGIN CERTIFICATE-----
@@ -55,24 +63,33 @@ DaO51gzKIn1Aumx5L76B64rp7LVWRpnwGPs=
 EOF
 openssl x509 -inform pem -in /etc/pki/akmods/certs/akmods-ublue.pem -out /etc/pki/akmods/certs/akmods-ublue.der
 
+# /*
 ### Configuration
+# */
 
+# /*
 # Duperemove configuration
+# */
 cat >/etc/default/duperemove<<'EOF'
 HashDir=/var/lib/duperemove
-# Additional options for duperemove binary
 OPTIONS="--skip-zeroes --hash=xxhash"
 EOF
 
+# /*
 ### TMPFILES.D
+# */
 
+# /*
 # Tmpfiles rpm-state
+# */
 mkdir -p /var/lib/rpm-state
 cat > /usr/lib/tmpfiles.d/cayo-rpm-state.conf<<'EOF'
 d /var/lib/rpm-state - - - -
 EOF
 
+# /*
 # Tmpfiles pcp
+# */
 cat > /usr/lib/tmpfiles.d/cayo-pcp.conf<<'EOF'
 d /var/lib/pcp/config/pmda 0775 pcp pcp -
 d /var/lib/pcp/config/pmie 0775 pcp pcp -
@@ -93,14 +110,20 @@ d /var/log/pcp/pmproxy 0775 pcp pcp -
 d /var/log/pcp/sa 0775 pcp pcp -
 EOF
 
+# /*
 # Tmpfiles duperemove
+# */
 cat > /usr/lib/tmpfiles.d/cayo-duperemove.conf<<'EOF'
 d /var/lib/duperemove - - - -
 EOF
 
+# /*
 ### Systemd Units
+# */
 
+# /*
 # add ZFS maintenance tasks
+# */
 cat > /usr/lib/systemd/system/zfs-scrub-monthly@.timer <<'EOF'
 [Unit]
 Description=Monthly zpool scrub timer for %i
@@ -149,9 +172,13 @@ else exec /usr/sbin/zpool scrub -w %i; fi'
 ExecStop=-/bin/sh -c '/usr/sbin/zpool scrub -p %i 2>/dev/null || true'
 EOF
 
+# /*
 ### Cockpit Plugin
+# */
 
+# /*
 # add cockpit plugin for ZFS management
+# */
 curl --fail --retry 15 --retry-all-errors -sSL -o /tmp/cockpit-zfs-manager-api.json \
     "https://api.github.com/repos/45Drives/cockpit-zfs-manager/releases/latest"
 CZM_TGZ_URL=$(jq -r .tarball_url /tmp/cockpit-zfs-manager-api.json)
@@ -159,8 +186,8 @@ curl --fail --retry 15 --retry-all-errors -sSL -o /tmp/cockpit-zfs-manager.tar.g
 
 mkdir -p /tmp/cockpit-zfs-manager
 tar -zxvf /tmp/cockpit-zfs-manager.tar.gz -C /tmp/cockpit-zfs-manager --strip-components=1
-mv /tmp/cockpit-zfs-manager/polkit-1/actions/* /usr/share/polkit-1/actions/
-mv /tmp/cockpit-zfs-manager/polkit-1/rules.d/* /usr/share/polkit-1/rules.d/
+cp -a /tmp/cockpit-zfs-manager/polkit-1/actions/. /usr/share/polkit-1/actions/
+cp -a /tmp/cockpit-zfs-manager/polkit-1/rules.d/. /usr/share/polkit-1/rules.d/
 mv /tmp/cockpit-zfs-manager/zfs /usr/share/cockpit
 
 curl --fail --retry 15 --retry-all-errors -sSL -o /tmp/cockpit-zfs-manager-font-fix.sh \
