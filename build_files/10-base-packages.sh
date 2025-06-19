@@ -2,6 +2,7 @@
 set -xeuo pipefail
 
 ### install base server packages
+RELEASE="$(rpm -E %centos)"
 
 ### add ublue-os specific packages
 dnf -y copr enable ublue-os/packages
@@ -48,3 +49,8 @@ dnf -y copr enable ublue-os/staging
 dnf -y install snapraid
 # dnf -y install sanoid
 dnf -y copr disable ublue-os/staging
+
+### install packages direct from github
+### NOTE: ARM support will require use of proper arch rather than hard coding
+/run/build_files/github-release-install.sh rclone/rclone "linux-amd64"
+/run/build_files/github-release-install.sh trapexit/mergerfs "el${RELEASE}.$(uname -m)"
