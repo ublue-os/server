@@ -5,8 +5,8 @@ set -eoux pipefail
 # set variant and url for unique identification
 # */
 sed -i 's|^HOME_URL=.*|HOME_URL="https://projectcayo.org"|' /usr/lib/os-release
-echo 'VARIANT="Cayo"' >> /usr/lib/os-release
-echo 'VARIANT_ID="cayo"' >> /usr/lib/os-release
+echo 'VARIANT="Cayo"' >>/usr/lib/os-release
+echo 'VARIANT_ID="cayo"' >>/usr/lib/os-release
 # /*
 # if VARIANT ever gets added to CentOS we'll need these instead
 #sed -i 's|^VARIANT=.*|VARIANT="Cayo"|' /usr/lib/os-release
@@ -16,8 +16,8 @@ echo 'VARIANT_ID="cayo"' >> /usr/lib/os-release
 # /*
 # set pretty name for base image
 # */
-SOURCE_VERSION="$(grep ^VERSION_ID= /usr/lib/os-release|cut -f2 -d=|tr -d \")"
-SOURCE_NAME="$(grep ^NAME= /usr/lib/os-release|cut -f2 -d=|tr -d \")"
+SOURCE_VERSION="$(grep ^VERSION_ID= /usr/lib/os-release | cut -f2 -d= | tr -d \")"
+SOURCE_NAME="$(grep ^NAME= /usr/lib/os-release | cut -f2 -d= | tr -d \")"
 sed -i "s|^PRETTY_NAME=.*|PRETTY_NAME=\"Cayo (Version $IMAGE_VERSION / FROM $SOURCE_NAME $SOURCE_VERSION)\"|" /usr/lib/os-release
 
 # /*
@@ -68,7 +68,7 @@ openssl x509 -inform pem -in /etc/pki/akmods/certs/akmods-ublue.pem -out /etc/pk
 # /*
 # Duperemove configuration
 # */
-cat >/etc/default/duperemove<<'EOF'
+cat >/etc/default/duperemove <<'EOF'
 HashDir=/var/lib/duperemove
 OPTIONS="--skip-zeroes --hash=xxhash"
 EOF
@@ -81,14 +81,14 @@ EOF
 # Tmpfiles rpm-state
 # */
 mkdir -p /var/lib/rpm-state
-cat > /usr/lib/tmpfiles.d/cayo-rpm-state.conf<<'EOF'
+cat >/usr/lib/tmpfiles.d/cayo-rpm-state.conf <<'EOF'
 d /var/lib/rpm-state - - - -
 EOF
 
 # /*
 # Tmpfiles pcp
 # */
-cat > /usr/lib/tmpfiles.d/cayo-pcp.conf<<'EOF'
+cat >/usr/lib/tmpfiles.d/cayo-pcp.conf <<'EOF'
 d /var/lib/pcp/config/pmda 0775 pcp pcp -
 d /var/lib/pcp/config/pmie 0775 pcp pcp -
 d /var/lib/pcp/config/pmlogger 0775 pcp pcp -
@@ -111,7 +111,7 @@ EOF
 # /*
 # Tmpfiles duperemove
 # */
-cat > /usr/lib/tmpfiles.d/cayo-duperemove.conf<<'EOF'
+cat >/usr/lib/tmpfiles.d/cayo-duperemove.conf <<'EOF'
 d /var/lib/duperemove - - - -
 EOF
 
@@ -122,7 +122,7 @@ EOF
 # /*
 # add ZFS maintenance tasks
 # */
-cat > /usr/lib/systemd/system/zfs-scrub-monthly@.timer <<'EOF'
+cat >/usr/lib/systemd/system/zfs-scrub-monthly@.timer <<'EOF'
 [Unit]
 Description=Monthly zpool scrub timer for %i
 Documentation=man:zpool-scrub(8)
@@ -137,7 +137,7 @@ Unit=zfs-scrub@%i.service
 WantedBy=timers.target
 EOF
 
-cat > /usr/lib/systemd/system/zfs-scrub-weekly@.timer <<'EOF'
+cat >/usr/lib/systemd/system/zfs-scrub-weekly@.timer <<'EOF'
 [Unit]
 Description=Weekly zpool scrub timer for %i
 Documentation=man:zpool-scrub(8)
@@ -152,7 +152,7 @@ Unit=zfs-scrub@%i.service
 WantedBy=timers.target
 EOF
 
-cat > /usr/lib/systemd/system/zfs-scrub@.service <<'EOF'
+cat >/usr/lib/systemd/system/zfs-scrub@.service <<'EOF'
 [Unit]
 Description=zpool scrub on %i
 Documentation=man:zpool-scrub(8)

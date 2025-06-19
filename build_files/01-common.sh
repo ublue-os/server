@@ -4,7 +4,7 @@
 
 set -xeuo pipefail
 
-# /* 
+# /*
 # See https://github.com/CentOS/centos-bootc/issues/191
 # */
 mkdir -m 0700 -p /var/roothome
@@ -58,7 +58,7 @@ sed -i 's|#LockLayering.*|LockLayering=true|' /etc/rpm-ostreed.conf
 # /*
 # Zram Generator
 # */
-cat >/usr/lib/systemd/zram-generator.conf<<'EOF'
+cat >/usr/lib/systemd/zram-generator.conf <<'EOF'
 [zram0]
 zram-size = min(ram, 8192)
 EOF
