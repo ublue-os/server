@@ -3,12 +3,14 @@ set unstable := true
 just := just_executable()
 podman := require('podman')
 podman-remote := which('podman-remote') || podman + ' --remote'
+builddir := shell('mkdir -p $1 && echo $1', absolute_path(env('CAYO_BUILD', 'build')))
 image := "cayo"
 variant := "base"
 version := "10"
 flavor := "main"
 
 # Source Images
+
 rechunker := shell("yq '.images.rechunker.source' images.yaml")
 bootc-image-builder := shell("yq '.images.bootc-image-builder.source' images.yaml")
 
@@ -18,6 +20,8 @@ _default:
 podman-info:
     {{ podman }} info
 
+[private]
+repo-org := "ublue-os"
 [private]
 PRIVKEY := '~/.local/share/containers/podman/machine/machine'
 [private]
@@ -66,23 +70,6 @@ if ! ' + podman + ' image exists "localhost/$image_name:$image_version"; then
     echo "' + style('warning') + 'Running' + NORMAL + ': ' + style('command') + '$cmd' + NORMAL + '" >&2
     $cmd
 fi
-'
-[private]
-pull-retry := '
-function pull-retry() {
-    local target="$1"
-    local retries=3
-    trap "exit 1" SIGINT
-    while [ $retries -gt 0 ]; do
-        ' + podman + ' pull $target && break
-        (( retries-- ))
-    done
-    if ! (( retries )); then
-        echo "' + style('error') + ' Unable to pull ${target/@*/}...' + NORMAL + '" >&2
-        exit 1
-    fi
-    trap - SIGINT
-}
 '
 
 [group('Utility')]
@@ -181,7 +168,6 @@ build-container $image="" $variant="" $flavor="" $version="":
     {{ default-inputs }}
     {{ just }} check-valid-image $image $variant $flavor $version
     {{ get-names }}
-    {{ pull-retry }}
     # Verify Source: do after upstream starts signing images
 
     # Tags
@@ -198,18 +184,27 @@ build-container $image="" $variant="" $flavor="" $version="":
     done
 
     # Pull akmods-zfs image with retry as we always need it for kernel and ZFS
-    pull-retry "$image_registry/akmods-zfs:centos-stream$version"
+    {{ podman }} pull --retry 3 "$image_registry/akmods-zfs:centos-stream$version"
 
     # Labels
     IMAGE_VERSION="$image_version.$TIMESTAMP"
     KERNEL_VERSION="$(skopeo inspect containers-storage:$image_registry/akmods-zfs:centos-stream$version | jq -r '.Labels["ostree.linux"]')"
     LABELS=(
-        "--label" "org.opencontainers.image.title=$image_name"
-        "--label" "org.opencontainers.image.version=${IMAGE_VERSION}"
-        "--label" "org.opencontainers.image.description=$image_description"
-        "--label" "ostree.linux=${KERNEL_VERSION}"
-        "--label" "io.artifacthub.package.readme-url=https://raw.githubusercontent.com/$image_registry/$image_repo/main/README.md"
+        "--label" "containers.bootc=1"
+        "--label" "io.artifacthub.package.deprecated=false"
+        "--label" "io.artifacthub.package.keywords=bootc,centos,cayo,ublue,universal-blue"
         "--label" "io.artifacthub.package.logo-url=https://avatars.githubusercontent.com/u/120078124?s=200&v=4"
+        "--label" "io.artifacthub.package.maintainers=[{\"name\": \"bsherman\", \"email\": \"benjamin@holyarmy.org\"}]"
+        "--label" "io.artifacthub.package.readme-url=https://raw.githubusercontent.com/$image_registry/$image_repo/main/README.md"
+        "--label" "org.opencontainers.image.created=$(date -u +%Y\-%m\-%d\T%H\:%M\:%S\Z)"
+        "--label" "org.opencontainers.image.description=$image_description"
+        "--label" "org.opencontainers.image.license=Apache-2.0"
+        "--label" "org.opencontainers.image.source=https://raw.githubusercontent.com/ublue-os/cayo/refs/heads/main/Containerfile.in"
+        "--label" "org.opencontainers.image.title=$image_name"
+        "--label" "org.opencontainers.image.url=https://github.com/ublue-os/cayo"
+        "--label" "org.opencontainers.image.vendor={{ repo-org }}"
+        "--label" "org.opencontainers.image.version=${IMAGE_VERSION}"
+        "--label" "ostree.linux=${KERNEL_VERSION}"
     )
 
     # BuildArgs
@@ -233,43 +228,49 @@ build-container $image="" $variant="" $flavor="" $version="":
     done
 
     # Pull source and akmods images with retry (akmods-zfs pulled above)
-    pull-retry "$source_image"
-    {{ if flavor == 'nvidia' { 'pull-retry "$image_registry/akmods-nvidia:centos-stream$version"' } else { '' } }}
+    {{ podman }} pull --retry 3 "$source_image"
+    {{ if flavor == 'nvidia' { podman + ' pull --retry 3 "$image_registry/akmods-nvidia:centos-stream$version"' } else { '' } }}
 
     # Build Image
     {{ podman }} build -f Containerfile.in "${BUILD_ARGS[@]}" "${LABELS[@]}" "${TAGS[@]}" .
 
-# Rechunk Image
-rechunk $image="" $variant="" $flavor="" $version="":
+# HHD-Dev Rechunk Image
+hhd-rechunk $image="" $variant="" $flavor="" $version="":
     #!/usr/bin/env bash
     {{ default-inputs }}
     {{ just }} check-valid-image $image $variant $flavor $version
     {{ get-names }}
-    {{ pull-retry }}
-    mkdir -p build/$image_name
-    if [[ "$(id -u)" != 0 ]]; then
-        {{ podman }} unshare -- {{ just }} rechunk $image $variant $flavor $version
-        exit $?
-    fi
+    mkdir -p {{ builddir / "$image_name" }}
+    {{ if shell('id -u') != '0' { podman + ' unshare -- ' + just + ' hhd-rechunk $image $variant $flavor $version; exit $?' } else { '' } }} 
 
-    cd build/$image_name
     set -xeou pipefail
 
     # Labels
     VERSION="$({{ podman }} inspect localhost/$image_name:$version --format '{{{{ index .Config.Labels "org.opencontainers.image.version" }}')"
+    KERNEL_VERSION="$({{ podman }} inspect localhost/$image_name:$version --format '{{{{ index .Config.Labels "ostree.linux" }}')"
     #KERNEL_VERSION= TODO may need to inspect the container contents for this
     LABELS="
-        org.opencontainers.image.title=$image_name
-        org.opencontainers.image.version=${VERSION}
-        org.opencontainers.image.description=$image_description
-        io.artifacthub.package.readme-url=https://raw.githubusercontent.com/$image_registry/$image_repo/main/README.md
+        containers.bootc=1
+        io.artifacthub.package.deprecated=false
+        io.artifacthub.package.keywords=bootc,centos,cayo,ublue,universal-blue
         io.artifacthub.package.logo-url=https://avatars.githubusercontent.com/u/120078124?s=200&v=4
+        io.artifacthub.package.maintainers=[{\"name\": \"bsherman\", \"email\": \"benjamin@holyarmy.org\"}]
+        io.artifacthub.package.readme-url=https://raw.githubusercontent.com/$image_registry/$image_repo/main/README.md
+        org.opencontainers.image.created=$(date -u +%Y\-%m\-%d\T%H\:%M\:%S\Z)
+        org.opencontainers.image.description=$image_description
+        org.opencontainers.image.license=Apache-2.0
+        org.opencontainers.image.source=https://raw.githubusercontent.com/ublue-os/cayo/refs/heads/main/Containerfile.in
+        org.opencontainers.image.title=$image_name
+        org.opencontainers.image.url=https://github.com/ublue-os/cayo
+        org.opencontainers.image.vendor={{ repo-org }}
+        org.opencontainers.image.version=${IMAGE_VERSION}
+        ostree.linux=${KERNEL_VERSION}
     "
     CREF=$({{ podman }} create localhost/$image_name:$version bash)
     OUT_NAME="$image_name.tar"
     MOUNT="$({{ podman }} mount $CREF)"
 
-    pull-retry "{{ rechunker }}"
+    {{ podman }} pull --retry 3 "{{ rechunker }}"
 
     {{ podman }} run --rm \
         --security-opt label=disable \
@@ -296,7 +297,7 @@ rechunk $image="" $variant="" $flavor="" $version="":
 
     {{ podman }} run --rm \
         --security-opt label=disable \
-        --volume "{{ justfile_dir() / "build/$image_name" }}:/workspace" \
+        --volume "{{ builddir / "$image_name" }}:/workspace" \
         --volume "{{ justfile_dir() }}:/var/git" \
         --volume cache_ostree:/var/ostree \
         --env REPO=/var/ostree/repo \
@@ -311,7 +312,7 @@ rechunk $image="" $variant="" $flavor="" $version="":
         {{ rechunker }} \
         /sources/rechunk/3_chunk.sh
     {{ podman }} volume rm cache_ostree
-    {{ if env("CI", "") != "" { 'mv $image_name.tar ' + justfile_dir() / '$image_name.tar' } else { '' } }}
+    {{ if env("CI", "") != "" { 'mv ' + builddir / '$image_name' / '$image_name.tar $image_name.tar ' } else { '' } }}
 
 # Removes all Tags of an image from container storage.
 [group('Utility')]
@@ -358,11 +359,11 @@ init-machine:
     {{ podman }} machine init \
         --rootful \
         --memory $(( 1024 * 8 )) \
-        --volume "{{ justfile_dir() }}:{{ justfile_dir() }}" \
-        --volume "{{ env('HOME') }}:{{ env('HOME') }}" 2>build/error.log
+        --volume "{{ justfile_dir() + ":" + justfile_dir() }}" \
+        --volume "{{ env('HOME') + ":" + env('HOME') }}" 2>{{ builddir }}/error.log
     ec=$?
-    if [ $ec = 125 ] && ! grep -q 'VM already exists' build/error.log; then 
-        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat build/error.log | sed -E 's/Error:\s//')" >&2
+    if [ $ec = 125 ] && ! grep -q 'VM already exists' {{ builddir }}/error.log; then 
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(sed -E 's/Error:\s//' {{ builddir }}/error.log)" >&2
         exit $ec
     fi
     exit 0
@@ -371,10 +372,10 @@ init-machine:
 start-machine: init-machine
     #!/usr/bin/env bash
     set -ou pipefail
-    {{ podman }} machine start 2>build/error.log
+    {{ podman }} machine start 2>{{ builddir }}/error.log
     ec=$?
-    if [ $ec = 125 ] && ! grep -q 'already running' build/error.log; then
-        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat build/error.log | sed -E 's/Error:\s//')" >&2
+    if [ $ec = 125 ] && ! grep -q 'already running' {{ builddir }}/error.log; then
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(sed -E 's/Error:\s//' {{ builddir }}/error.log)" >&2
         exit $ec
     fi
     exit 0
@@ -386,23 +387,25 @@ build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-mach
     {{ get-names }}
     set -eou pipefail
     # Create Build Dir
-    mkdir -p build/$image_name
+    mkdir -p {{ builddir }}/$image_name
 
     # Process Template
-    cp iso_files/disk.toml build/$image_name/disk.toml
-    sed -i "s/<SSHPUBKEY>/$(cat {{ PUBKEY }})/" build/$image_name/disk.toml
+    cp iso_files/disk.toml {{ builddir }}/$image_name/disk.toml
+    sed -i "s/<SSHPUBKEY>/$(cat {{ PUBKEY }})/" {{ builddir }}/$image_name/disk.toml
 
     # Load image into rootful podman-machine
     if ! {{ podman }} image exists $registry/$image_name:$version; then
         echo "{{ style('error') }}Error:{{ NORMAL }} Image \"$registry/$image_name:$version\" not in image-store" >&2
         exit 1
     fi
-    {{ podman-remote }} image exists $registry/$image_name:$version ||
-        {{ podman }} image scp $registry/$image_name:$version podman-machine-default-root::
-    
+    if ! {{ podman-remote }} image exists $registry/$image_name:$version; then
+        COPYTMP=$(mktemp -p {{ builddir }} -d -t podman_scp.XXXXXXXXXX) && trap 'rm -rf $COPYTMP' EXIT SIGINT
+        TMPDIR=$COPYTMP {{ podman }} image scp $registry/$image_name:$version podman-machine-default-root::
+    fi
+
     # Pull Bootc Image Builder
     {{ podman-remote }} pull --retry 3 {{ bootc-image-builder }}
-    
+
     # Build Disk Image
     {{ podman-remote }} run \
         --rm \
@@ -410,11 +413,11 @@ build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-mach
         --privileged \
         --pull=newer \
         --security-opt label=type:unconfined_t \
-        -v ./build/$image_name/disk.toml:/config.toml:ro \
-        -v ./build/$image_name:/output \
+        -v {{ builddir }}/$image_name/disk.toml:/config.toml:ro \
+        -v {{ builddir }}/$image_name:/output \
         -v /var/lib/containers/storage:/var/lib/containers/storage \
         quay.io/centos-bootc/bootc-image-builder:latest \
-        {{ if env('CI', '') == '' { '--progress verbose' } else { '--progress terminal'} }} \
+        {{ if env('CI', '') != '' { '--progress verbose' } else { '--progress term' } }} \
         --type qcow2 \
         --use-librepo=True \
         --rootfs xfs \
@@ -426,23 +429,23 @@ run-disk $image="" $variant="" $flavor="" $version="" $registry="":
     : "${registry:=localhost}"
     {{ get-names }}
     set -ou pipefail
-    if [ ! -f build/$image_name/qcow2/disk.qcow2 ]; then
+    if [ ! -f {{ builddir }}/$image_name/qcow2/disk.qcow2 ]; then
         echo "{{ style('error') }}Error:{{ NORMAL }} Disk Image \"$image_name\" not built" >&2 && exit 1
     fi
 
     {{ require('macadam') }} init \
         --ssh-identity-path {{ PRIVKEY }} \
-        --username root 2>build/error.log \
-        build/$image_name/qcow2/disk.qcow2
+        --username root 2>{{ builddir }}/error.log \
+        {{ builddir }}/$image_name/qcow2/disk.qcow2
     ec=$?
-    if [ $ec = 125 ] && ! grep -q 'VM already exists' build/error.log; then
-        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat build/error.log | sed -E 's/Error:\s//')" >&2
+    if [ $ec = 125 ] && ! grep -q 'VM already exists' {{ builddir }}/error.log; then
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(sed -E 's/Error:\s//' {{ builddir }}/error.log)" >&2
     fi
 
-    macadam start 2>build/error.log
+    macadam start 2>{{ builddir }}/error.log
     ec=$?
-    if [ $ec = 125 ] && ! grep -q 'already running' build/error.log; then
-        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat build/error.log | sed -E 's/Error:\s//')" >&2
+    if [ $ec = 125 ] && ! grep -q 'already running' {{ builddir }}/error.log; then
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat {{ builddir }}/error.log | sed -E 's/Error:\s//')" >&2
         printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat $XDG_RUNTIME_DIR/macadam/gvproxy.log)" >&2
         exit $?
     fi
