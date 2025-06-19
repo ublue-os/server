@@ -43,6 +43,14 @@ RUN --mount=type=cache,dst=/var/cache \
     /ctx/11-base-zfs.sh && \
     ostree container commit
 
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/12-base-kmods.sh && \
+    ostree container commit
+
 #ifdef NVIDIA
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
