@@ -30,9 +30,11 @@
                 "github.vscode-pull-request-github",
                 "hangxingliu.vscode-systemd-support",
                 "mads-hartmann.bash-ide-vscode",
-                "nefrob.vscode-just-syntax",
-                "timonwong.shellcheck"
-            ]
+                "nefrob.vscode-just-syntax"
+            ],
+            "settings": {
+                "bashIde.shellcheckArguments": "--exclude SC2148,SC1113"
+            }
         }
     },
     "runArgs": ["--name", "devcontainer-${containerWorkspaceFolderBasename}"],

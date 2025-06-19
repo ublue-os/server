@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # /*
 #shellcheck disable=SC1083
 # */
@@ -8,6 +7,8 @@ set -eoux pipefail
 # /*
 ### Kernel Swap to Kernel signed with our MOK
 # */
+
+find /tmp/kernel-rpms
 
 pushd /tmp/kernel-rpms
 CACHED_VERSION=$(find kernel-*.rpm | grep -P "kernel-\d+\.\d+\.\d+-\d+$(rpm -E %{dist})" | sed -E 's/kernel-//;s/\.rpm//')
