@@ -2,7 +2,7 @@
 set -xeuo pipefail
 
 # enable Kmods SIG repos
-dnf -y install https://mirror.stream.centos.org/SIGs/$(rpm --eval '%{?rhel}/kmods/%{_arch}/repos-main/Packages/c/centos-repos-kmods-%{?rhel}-2.el%{?rhel}.noarch.rpm')
+dnf -y install "https://mirror.stream.centos.org/SIGs/$(rpm --eval '%{?rhel}/kmods/%{_arch}/repos-main/Packages/c/centos-repos-kmods-%{?rhel}-2.el%{?rhel}.noarch.rpm')"
 dnf -y install centos-release-kmods
 dnf config-manager --set-enabled centos-kmods-rebuild
 
