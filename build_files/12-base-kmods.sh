@@ -10,9 +10,9 @@ dnf config-manager --set-enabled centos-kmods-rebuild
 dnf -y install \
     btrfs-progs \
     kmod-aacraid \
+    kmod-btrfs \
     kmod-be2iscsi \
     kmod-be2net \
-    kmod-btrfs \
     kmod-hpsa \
     kmod-lpfc \
     kmod-megaraid_sas \
