@@ -1,5 +1,5 @@
 FROM scratch AS ctx
-COPY build_files /
+COPY build_files/99-finalize.sh build_files/github-release-install.sh /
 
 #ifdef NVIDIA
 FROM NVIDIA as akmods_nvidia
@@ -9,85 +9,100 @@ FROM SOURCE_IMAGE as cayo
 
 ARG IMAGE_VERSION
 
+COPY build_files/01-common.sh /run/ctx/01-common.sh
 RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
+    --mount=type=tmpfs,dst=/tmp \
+    /run/ctx/01-common.sh && \
+    ostree container commit
+
+COPY build_files/02-docker.sh /run/ctx/02-docker.sh
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
+    --mount=type=tmpfs,dst=/tmp \
+    /run/ctx/02-docker.sh && \
+    ostree container commit
+
+COPY build_files/10-base-packages.sh /run/ctx/10-base-packages.sh
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
+    --mount=type=tmpfs,dst=/tmp \
+    /run/ctx/10-base-packages.sh && \
+    ostree container commit
+
+COPY build_files/10-base-packages-github.sh /run/ctx/10-base-packages-github.sh
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
+    --mount=type=tmpfs,dst=/tmp \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
+    /run/ctx/10-base-packages-github.sh && \
+    ostree container commit
+
+COPY build_files/11-base-kernel-swap.sh /run/ctx/11-base-kernel-swap.sh
+RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/var/log \
     --mount=type=tmpfs,dst=/var/tmp \
     --mount=type=tmpfs,dst=/tmp \
     --mount=type=bind,from=akmods_zfs,source=/kernel-rpms,dst=/tmp/kernel-rpms \
-    /ctx/01-common.sh && \
+    /run/ctx/11-base-kernel-swap.sh && \
     ostree container commit
 
+COPY build_files/12-base-zfs.sh /run/ctx/12-base-zfs.sh
 RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=bind,from=ctx,source=/,target=/ctx \
-    --mount=type=tmpfs,dst=/var/log \
-    --mount=type=tmpfs,dst=/var/tmp \
-    --mount=type=tmpfs,dst=/tmp \
-    /ctx/02-docker.sh && \
-    ostree container commit
-
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=bind,from=ctx,source=/,target=/ctx \
-    --mount=type=tmpfs,dst=/var/log \
-    --mount=type=tmpfs,dst=/var/tmp \
-    --mount=type=tmpfs,dst=/tmp \
-    /ctx/10-base-packages.sh && \
-    ostree container commit
-
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/var/log \
     --mount=type=tmpfs,dst=/var/tmp \
     --mount=type=tmpfs,dst=/tmp \
     --mount=type=bind,from=akmods_zfs,src=/rpms,dst=/tmp/akmods-zfs-rpms \
-    /ctx/11-base-zfs.sh && \
+    /run/ctx/12-base-zfs.sh && \
     ostree container commit
 
-#ifdef NVIDIA
+COPY build_files/13-base-configurations.sh /run/ctx/13-base-configurations.sh
 RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
+    --mount=type=tmpfs,dst=/tmp \
+    /run/ctx/13-base-configurations.sh && \
+    ostree container commit
+
+#ifdef HCI
+COPY build_files/30-virt-packages.sh /run/ctx/30-virt-packages.sh
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
+    --mount=type=tmpfs,dst=/tmp \
+    /run/ctx/30-virt-packages.sh && \
+    ostree container commit
+
+COPY build_files/33-virt-configurations.sh /run/ctx/33-virt-configurations.sh
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=tmpfs,dst=/var/log \
+    --mount=type=tmpfs,dst=/var/tmp \
+    --mount=type=tmpfs,dst=/tmp \
+    /run/ctx/33-virt-configurations.sh && \
+    ostree container commit
+#endif /* HCI */
+
+#ifdef NVIDIA
+COPY build_files/80-nvidia.sh /run/ctx/80-nvidia.sh
+RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/var/log \
     --mount=type=tmpfs,dst=/var/tmp \
     --mount=type=tmpfs,dst=/tmp \
     --mount=type=bind,from=akmods_nvidia,src=/rpms,dst=/tmp/akmods-nv-rpms \
-    /ctx/12-base-nvidia.sh && \
+    /run/ctx/80-nvidia.sh && \
     ostree container commit
 #endif /* NVIDIA */
 
-#if defined(NAS) || defined(HCI)
+COPY build_files/98-cleanup.sh /run/ctx/98-cleanup.sh
 RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/var/log \
     --mount=type=tmpfs,dst=/var/tmp \
     --mount=type=tmpfs,dst=/tmp \
-    /ctx/20-nas-packages.sh && \
-    ostree container commit
-
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=bind,from=ctx,source=/,target=/ctx \
-    --mount=type=tmpfs,dst=/var/log \
-    --mount=type=tmpfs,dst=/var/tmp \
-    --mount=type=tmpfs,dst=/tmp \
-    /ctx/21-nas-zfs.sh && \
-    ostree container commit
-#endif /* defined(NAS) || defined(HCI) */
-
-#ifdef HCI
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=bind,from=ctx,source=/,target=/ctx \
-    --mount=type=tmpfs,dst=/var/log \
-    --mount=type=tmpfs,dst=/var/tmp \
-    --mount=type=tmpfs,dst=/tmp \
-    /ctx/30-virt-packages.sh && \
-    ostree container commit
-#endif /* HCI */
-
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=bind,from=ctx,source=/,target=/ctx \
-    --mount=type=tmpfs,dst=/var/log \
-    --mount=type=tmpfs,dst=/var/tmp \
-    --mount=type=tmpfs,dst=/tmp \
-    /ctx/98-cleanup.sh && \
+    /run/ctx/98-cleanup.sh && \
     ostree container commit
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \

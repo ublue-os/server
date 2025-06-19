@@ -3,6 +3,9 @@
 
 set -eoux pipefail
 
+# Cleanup /run/ctx
+rm -rf /run/ctx
+
 # Make Sure /tmp and /var are in proper state
 rm -rf /tmp/*
 rm -rf /var/*

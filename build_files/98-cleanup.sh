@@ -20,5 +20,5 @@ for kernel_dir in /usr/lib/modules/*; do
     fi
 done
 
-# Remove Versionlocks
+# Remove Versionlocks (Needs dnf cache to run)
 dnf versionlock clear
