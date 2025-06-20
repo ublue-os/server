@@ -111,11 +111,3 @@ cat >/usr/lib/systemd/zram-generator.conf<<'EOF'
 [zram0]
 zram-size = min(ram, 8192)
 EOF
-
-### TMPFILES.D
-
-# Create rpm-state
-mkdir -p /var/lib/rpm-state
-cat > /usr/lib/tmpfiles.d/cayo-rpm-state.conf<<'EOF'
-d /var/lib/rpm-state - - - -
-EOF
