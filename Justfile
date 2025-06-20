@@ -21,7 +21,7 @@ podman-info:
     {{ podman }} info
 
 [private]
-PRIVKEY := '~/.local/share/containers/podman/machine/machine'
+PRIVKEY := env('HOME') / '.local/share/containers/podman/machine/machine'
 [private]
 PUBKEY := PRIVKEY + '.pub'
 [private]
@@ -372,7 +372,7 @@ build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-mach
 
     # Process Template
     cp iso_files/disk.toml {{ builddir }}/$image_name/disk.toml
-    sed -i "s/<SSHPUBKEY>/$(cat {{ PUBKEY }})/" {{ builddir }}/$image_name/disk.toml
+    sed -i "s|<SSHPUBKEY>|$(cat {{ PUBKEY }})|" {{ builddir }}/$image_name/disk.toml
 
     # Load image into rootful podman-machine
     if ! {{ podman }} image exists $registry/$image_name:$version; then
