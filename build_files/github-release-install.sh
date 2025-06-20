@@ -24,17 +24,17 @@ usage() {
 
 }
 
-if [ -z ${ORG_PROJ} ]; then
+if [ -z "${ORG_PROJ}" ]; then
   usage
   exit 1
 fi
 
-if [ -z ${ARCH_FILTER} ]; then
+if [ -z "${ARCH_FILTER}" ]; then
   usage
   exit 2
 fi
 
-if [ -z ${LATEST} ]; then
+if [ -z "${LATEST}" ]; then
   RELTAG="latest"
 else
   RELTAG="tags/${LATEST}"
@@ -46,11 +46,11 @@ API_JSON=$(mktemp /tmp/api-XXXXXXXX.json)
 API="https://api.github.com/repos/${ORG_PROJ}/releases/${RELTAG}"
 
 # retry up to 5 times with 5 second delays for any error included HTTP 404 etc
-curl --fail --retry 5 --retry-delay 5 --retry-all-errors -sL ${API} -o ${API_JSON}
-RPM_URLS=($(cat ${API_JSON} \
-  | jq \
+curl --fail --retry 5 --retry-delay 5 --retry-all-errors -sL "${API}" -o "${API_JSON}"
+mapfile -t RPM_URLS < <(jq \
     -r \
     --arg arch_filter "${ARCH_FILTER}" \
-    '.assets | sort_by(.created_at) | reverse | .[] | select(.name|test($arch_filter)) | select(.name|test("rpm$")) | .browser_download_url'))
+    '.assets | sort_by(.created_at) | reverse | .[] | select(.name|test($arch_filter)) | select(.name|test("rpm$")) | .browser_download_url' < "${API_JSON}")
+
 # WARNING: in case of multiple matches, this only installs the first matched release
 dnf -y install "${RPM_URLS[0]}"
