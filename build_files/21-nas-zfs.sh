@@ -7,57 +7,6 @@ set -xeuo pipefail
 # dnf -y install sanoid
 # dnf -y copr disable ublue-os/staging
 
-
-# add ZFS maintenance tasks
-cat > /usr/lib/systemd/system/zfs-scrub-monthly@.timer <<'EOF'
-[Unit]
-Description=Monthly zpool scrub timer for %i
-Documentation=man:zpool-scrub(8)
-
-[Timer]
-OnCalendar=monthly
-Persistent=true
-RandomizedDelaySec=1h
-Unit=zfs-scrub@%i.service
-
-[Install]
-WantedBy=timers.target
-EOF
-
-cat > /usr/lib/systemd/system/zfs-scrub-weekly@.timer <<'EOF'
-[Unit]
-Description=Weekly zpool scrub timer for %i
-Documentation=man:zpool-scrub(8)
-
-[Timer]
-OnCalendar=weekly
-Persistent=true
-RandomizedDelaySec=1h
-Unit=zfs-scrub@%i.service
-
-[Install]
-WantedBy=timers.target
-EOF
-
-cat > /usr/lib/systemd/system/zfs-scrub@.service <<'EOF'
-[Unit]
-Description=zpool scrub on %i
-Documentation=man:zpool-scrub(8)
-Requires=zfs.target
-After=zfs.target
-ConditionACPower=true
-ConditionPathIsDirectory=/sys/module/zfs
-
-[Service]
-EnvironmentFile=-@initconfdir@/zfs
-ExecStart=/bin/sh -c '\
-if /usr/sbin/zpool status %i | grep -q "scrub in progress"; then\
-exec /usr/sbin/zpool wait -t scrub %i;\
-else exec /usr/sbin/zpool scrub -w %i; fi'
-ExecStop=-/bin/sh -c '/usr/sbin/zpool scrub -p %i 2>/dev/null || true'
-EOF
-
-
 # add cockpit plugin for ZFS management
 curl --fail --retry 15 --retry-all-errors -sSL -o /tmp/cockpit-zfs-manager-api.json \
     "https://api.github.com/repos/45Drives/cockpit-zfs-manager/releases/latest"
