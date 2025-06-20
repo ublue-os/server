@@ -12,11 +12,6 @@ dnf -y install --setopt=install_weak_deps=False \
     ublue-os-libvirt-workarounds \
     virt-install
 
-### sysusers.d for libvirtdbus
-cat >/usr/lib/sysusers.d/libvirt-dbus.conf <<'EOF'
-u libvirtdbus - 'Libvirt D-Bus bridge' - -
-EOF
-
 dnf -y copr disable ublue-os/packages
 
 # set pretty name for HCI image
