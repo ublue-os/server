@@ -360,10 +360,10 @@ init-machine:
         --rootful \
         --memory $(( 1024 * 8 )) \
         --volume "{{ justfile_dir() + ":" + justfile_dir() }}" \
-        --volume "{{ env('HOME') + ":" + env('HOME') }}" 2>{{ builddir }}/error.log
+        --volume "{{ env('HOME') + ":" + env('HOME') }}" 2>>{{ builddir }}/error.log
     ec=$?
     if [ $ec = 125 ] && ! grep -q 'VM already exists' {{ builddir }}/error.log; then
-        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(sed -E 's/Error:\s//' {{ builddir }}/error.log)" >&2
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(tail -n1 {{ builddir }}/error.log | sed -E 's/Error:\s//')" >&2
         exit $ec
     fi
     exit 0
@@ -372,10 +372,10 @@ init-machine:
 start-machine: init-machine
     #!/usr/bin/env bash
     set -ou pipefail
-    {{ podman }} machine start 2>{{ builddir }}/error.log
+    {{ podman }} machine start 2>>{{ builddir }}/error.log
     ec=$?
     if [ $ec = 125 ] && ! grep -q 'already running' {{ builddir }}/error.log; then
-        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(sed -E 's/Error:\s//' {{ builddir }}/error.log)" >&2
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(tail -n1 {{ builddir }}/error.log | sed -E 's/Error:\s//')" >&2
         exit $ec
     fi
     exit 0
@@ -399,8 +399,9 @@ build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-mach
         exit 1
     fi
     if ! {{ podman-remote }} image exists $registry/$image_name:$version; then
-        COPYTMP=$(mktemp -p {{ builddir }} -d -t podman_scp.XXXXXXXXXX) && trap 'rm -rf $COPYTMP' EXIT SIGINT
-        TMPDIR=$COPYTMP {{ podman }} image scp $registry/$image_name:$version podman-machine-default-root::
+        COPYTMP="$(mktemp -p {{ builddir }} -d -t podman_scp.XXXXXXXXXX)" && trap 'rm -rf $COPYTMP' EXIT SIGINT
+        TMPDIR="$COPYTMP" {{ podman }} image scp $registry/$image_name:$version podman-machine-default-root::
+        rm -rf "$COPYTMP"
     fi
 
     # Pull Bootc Image Builder
@@ -435,18 +436,18 @@ run-disk $image="" $variant="" $flavor="" $version="" $registry="":
 
     {{ require('macadam') }} init \
         --ssh-identity-path {{ PRIVKEY }} \
-        --username root 2>{{ builddir }}/error.log \
+        --username root 2>>{{ builddir }}/error.log \
         {{ builddir }}/$image_name/qcow2/disk.qcow2
     ec=$?
     if [ $ec = 125 ] && ! grep -q 'VM already exists' {{ builddir }}/error.log; then
-        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(sed -E 's/Error:\s//' {{ builddir }}/error.log)" >&2
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(tail -n1 {{ builddir }}/error.log | sed -E 's/Error:\s//')" >&2
     fi
 
-    macadam start 2>{{ builddir }}/error.log
+    macadam start 2>>{{ builddir }}/error.log
     ec=$?
     if [ $ec = 125 ] && ! grep -q 'already running' {{ builddir }}/error.log; then
-        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat {{ builddir }}/error.log | sed -E 's/Error:\s//')" >&2
-        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(cat $XDG_RUNTIME_DIR/macadam/gvproxy.log)" >&2
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(tail -n1 {{ builddir }}/error.log | sed -E 's/Error:\s//')" >&2
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(tail -n1 ${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/macadam/gvproxy.log)" >&2
         exit $?
     fi
     macadam ssh -- cat /etc/os-release
