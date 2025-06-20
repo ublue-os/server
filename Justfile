@@ -247,25 +247,7 @@ hhd-rechunk $image="" $variant="" $flavor="" $version="":
 
     # Labels
     VERSION="$({{ podman }} inspect localhost/$image_name:$version --format '{{{{ index .Config.Labels "org.opencontainers.image.version" }}')"
-    KERNEL_VERSION="$({{ podman }} inspect localhost/$image_name:$version --format '{{{{ index .Config.Labels "ostree.linux" }}')"
-    #KERNEL_VERSION= TODO may need to inspect the container contents for this
-    LABELS="
-        containers.bootc=1
-        io.artifacthub.package.deprecated=false
-        io.artifacthub.package.keywords=bootc,centos,cayo,ublue,universal-blue
-        io.artifacthub.package.logo-url=https://avatars.githubusercontent.com/u/120078124?s=200&v=4
-        io.artifacthub.package.maintainers=[{\"name\": \"bsherman\", \"email\": \"benjamin@holyarmy.org\"}]
-        io.artifacthub.package.readme-url=https://raw.githubusercontent.com/$image_registry/$image_repo/main/README.md
-        org.opencontainers.image.created=$(date -u +%Y\-%m\-%d\T%H\:%M\:%S\Z)
-        org.opencontainers.image.description=$image_description
-        org.opencontainers.image.license=Apache-2.0
-        org.opencontainers.image.source=https://raw.githubusercontent.com/ublue-os/cayo/refs/heads/main/Containerfile.in
-        org.opencontainers.image.title=$image_name
-        org.opencontainers.image.url=https://github.com/ublue-os/cayo
-        org.opencontainers.image.vendor={{ repo-org }}
-        org.opencontainers.image.version=${VERSION}
-        ostree.linux=${KERNEL_VERSION}
-    "
+    LABELS="$({{ podman }} inspect localhost/$image_name:$version | jq -r '.[].Config.Labels | to_entries | map("\(.key)=\(.value|tostring)")|.[]')"
     CREF=$({{ podman }} create localhost/$image_name:$version bash)
     OUT_NAME="$image_name.tar"
     MOUNT="$({{ podman }} mount $CREF)"
