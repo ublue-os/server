@@ -241,7 +241,7 @@ hhd-rechunk $image="" $variant="" $flavor="" $version="":
     {{ just }} check-valid-image $image $variant $flavor $version
     {{ get-names }}
     mkdir -p {{ builddir / "$image_name" }}
-    {{ if shell('id -u') != '0' { podman + ' unshare -- ' + just + ' hhd-rechunk $image $variant $flavor $version; exit $?' } else { '' } }} 
+    {{ if shell('id -u') != '0' { podman + ' unshare -- ' + just + ' hhd-rechunk $image $variant $flavor $version; exit $?' } else { '' } }}
 
     set -xeou pipefail
 
@@ -263,7 +263,7 @@ hhd-rechunk $image="" $variant="" $flavor="" $version="":
         org.opencontainers.image.title=$image_name
         org.opencontainers.image.url=https://github.com/ublue-os/cayo
         org.opencontainers.image.vendor={{ repo-org }}
-        org.opencontainers.image.version=${IMAGE_VERSION}
+        org.opencontainers.image.version=${VERSION}
         ostree.linux=${KERNEL_VERSION}
     "
     CREF=$({{ podman }} create localhost/$image_name:$version bash)
@@ -362,7 +362,7 @@ init-machine:
         --volume "{{ justfile_dir() + ":" + justfile_dir() }}" \
         --volume "{{ env('HOME') + ":" + env('HOME') }}" 2>{{ builddir }}/error.log
     ec=$?
-    if [ $ec = 125 ] && ! grep -q 'VM already exists' {{ builddir }}/error.log; then 
+    if [ $ec = 125 ] && ! grep -q 'VM already exists' {{ builddir }}/error.log; then
         printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(sed -E 's/Error:\s//' {{ builddir }}/error.log)" >&2
         exit $ec
     fi
