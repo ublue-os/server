@@ -21,8 +21,6 @@ podman-info:
     {{ podman }} info
 
 [private]
-repo-org := "ublue-os"
-[private]
 PRIVKEY := '~/.local/share/containers/podman/machine/machine'
 [private]
 PUBKEY := PRIVKEY + '.pub'
@@ -47,7 +45,8 @@ function image-get() {
     echo ${data}
 }
 source_image="$(image-get source)"
-image_registry="$(image-get registry)/$(image-get org)"
+image_org="$(image-get org)"
+image_registry="$(image-get registry)"
 image_repo="$(image-get repo)"
 image_name="$(image-get name)"
 image_version="$(image-get version)"
@@ -184,25 +183,25 @@ build-container $image="" $variant="" $flavor="" $version="":
     done
 
     # Pull akmods-zfs image with retry as we always need it for kernel and ZFS
-    {{ podman }} pull --retry 3 "$image_registry/akmods-zfs:centos-stream$version"
+    {{ podman }} pull --retry 3 "$image_registry/$image_org/akmods-zfs:centos-stream$version"
 
     # Labels
     IMAGE_VERSION="$image_version.$TIMESTAMP"
-    KERNEL_VERSION="$(skopeo inspect containers-storage:$image_registry/akmods-zfs:centos-stream$version | jq -r '.Labels["ostree.linux"]')"
+    KERNEL_VERSION="$(skopeo inspect containers-storage:$image_registry/$image_org/akmods-zfs:centos-stream$version | jq -r '.Labels["ostree.linux"]')"
     LABELS=(
         "--label" "containers.bootc=1"
         "--label" "io.artifacthub.package.deprecated=false"
         "--label" "io.artifacthub.package.keywords=bootc,centos,cayo,ublue,universal-blue"
         "--label" "io.artifacthub.package.logo-url=https://avatars.githubusercontent.com/u/120078124?s=200&v=4"
         "--label" "io.artifacthub.package.maintainers=[{\"name\": \"bsherman\", \"email\": \"benjamin@holyarmy.org\"}]"
-        "--label" "io.artifacthub.package.readme-url=https://raw.githubusercontent.com/$image_registry/$image_repo/main/README.md"
+        "--label" "io.artifacthub.package.readme-url=https://raw.githubusercontent.com/$image_registry/$image_org/$image_repo/main/README.md"
         "--label" "org.opencontainers.image.created=$(date -u +%Y\-%m\-%d\T%H\:%M\:%S\Z)"
         "--label" "org.opencontainers.image.description=$image_description"
         "--label" "org.opencontainers.image.license=Apache-2.0"
         "--label" "org.opencontainers.image.source=https://raw.githubusercontent.com/ublue-os/cayo/refs/heads/main/Containerfile.in"
         "--label" "org.opencontainers.image.title=$image_name"
-        "--label" "org.opencontainers.image.url=https://github.com/ublue-os/cayo"
-        "--label" "org.opencontainers.image.vendor={{ repo-org }}"
+        "--label" "org.opencontainers.image.url=https://github.com/$image_org/$image_repo"
+        "--label" "org.opencontainers.image.vendor=$image_org"
         "--label" "org.opencontainers.image.version=${IMAGE_VERSION}"
         "--label" "ostree.linux=${KERNEL_VERSION}"
     )
@@ -214,12 +213,12 @@ build-container $image="" $variant="" $flavor="" $version="":
         "--device" "/dev/fuse"
         "--build-arg=IMAGE_VERSION=$IMAGE_VERSION"
         "--cpp-flag=-DSOURCE_IMAGE=$source_image"
-        "--cpp-flag=-DZFS=$image_registry/akmods-zfs:centos-stream$version"
+        "--cpp-flag=-DZFS=$image_registry/$image_org/akmods-zfs:centos-stream$version"
     )
     for FLAG in $image_cpp_flags; do
         case "${FLAG:-}" in
         "NVIDIA")
-            BUILD_ARGS+=("--cpp-flag=-D$FLAG=$image_registry/akmods-nvidia:centos-stream$version")
+            BUILD_ARGS+=("--cpp-flag=-D$FLAG=$image_registry/$image_org/akmods-nvidia:centos-stream$version")
             ;;
         *)
             BUILD_ARGS+=("--cpp-flag=-D$FLAG=1")
@@ -229,7 +228,7 @@ build-container $image="" $variant="" $flavor="" $version="":
 
     # Pull source and akmods images with retry (akmods-zfs pulled above)
     {{ podman }} pull --retry 3 "$source_image"
-    {{ if flavor == 'nvidia' { podman + ' pull --retry 3 "$image_registry/akmods-nvidia:centos-stream$version"' } else { '' } }}
+    {{ if flavor == 'nvidia' { podman + ' pull --retry 3 "$image_registry/$image_org/akmods-nvidia:centos-stream$version"' } else { '' } }}
 
     # Build Image
     {{ podman }} build -f Containerfile.in "${BUILD_ARGS[@]}" "${LABELS[@]}" "${TAGS[@]}" .
@@ -283,7 +282,7 @@ hhd-rechunk $image="" $variant="" $flavor="" $version="":
         --volume "{{ justfile_dir() }}:/var/git" \
         --volume cache_ostree:/var/ostree \
         --env REPO=/var/ostree/repo \
-        --env PREV_REF="$image_registry/$image_name:$version" \
+        --env PREV_REF="$image_registry/$image_org/$image_name:$version" \
         --env LABELS="$LABELS" \
         --env OUT_NAME="$OUT_NAME" \
         --env VERSION="$VERSION" \
@@ -325,7 +324,7 @@ push-to-registry $image $variant $flavor $version $destination="" $transport="":
     {{ get-names }}
     {{ build-missing }}
 
-    : "${destination:=$image_registry}"
+    : "${destination:=$image_registry/$image_org}"
     : "${transport:="docker://"}"
 
     declare -a TAGS="($({{ podman }} image list localhost/$image_name:$image_version --noheading --format 'table {{{{ .Tag }}'))"
