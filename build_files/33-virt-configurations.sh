@@ -1,13 +1,6 @@
 set -eoux pipefail
 
 # /*
-### sysusers.d for libvirtdbus
-# */
-cat >/usr/lib/sysusers.d/libvirt-dbus.conf <<'EOF'
-u libvirtdbus - 'Libvirt D-Bus bridge' - -
-EOF
-
-# /*
 # set pretty name for HCI image
 # */
 SOURCE_VERSION="$(grep ^VERSION_ID= /usr/lib/os-release | cut -f2 -d= | tr -d \")"

@@ -11,6 +11,7 @@ dnf -y copr enable ublue-os/packages
 dnf -y install --setopt=install_weak_deps=False \
     cockpit-machines \
     libvirt-client \
+    libvirt-daemon \
     libvirt-daemon-kvm \
     ublue-os-libvirt-workarounds \
     virt-install
