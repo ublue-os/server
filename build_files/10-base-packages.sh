@@ -51,7 +51,6 @@ dnf config-manager --set-disabled tailscale-stable
 
 dnf -y copr enable ublue-os/staging
 dnf -y install snapraid
-# /* dnf -y install sanoid # Currently missing dependencies */
 dnf -y copr disable ublue-os/staging
 
 # /*
