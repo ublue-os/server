@@ -30,6 +30,43 @@ dnf -y install --setopt=install_weak_deps=False \
 
 dnf config-manager --set-disabled tailscale-stable
 
+# Cockpit Web Service unit
+cat > /usr/lib/systemd/system/cockpit.service<<'EOF'
+[Unit]
+Description=Cockpit Container
+After=network-online.target
+Wants=network-online.target
+RequiresMountsFor=%t/containers
+RequiresMountsFor=/
+
+[X-Container]
+Image=quay.io/cockpit/ws:latest
+ContainerName=cockpit-ws
+Environment=NAME=cockpit-ws
+
+#flag for autoupdates
+Label=io.containers.autoupdate=registry
+
+Volume=/:/host
+PodmanArgs=--pid host --privileged
+Exec=/container/label-run
+
+[Service]
+Restart=always
+Environment=PODMAN_SYSTEMD_UNIT=%n
+KillMode=mixed
+ExecStopPost=-/usr/bin/podman rm -f -i --cidfile=%t/%N.cid
+ExecStopPost=-rm -f %t/%N.cid
+Delegate=yes
+Type=notify
+NotifyAccess=all
+SyslogIdentifier=%N
+ExecStart=/usr/bin/podman run --name=ws --cidfile=%t/%N.cid --replace --rm --cgroups=split --sdnotify=conmon -d -v /:/host --env NAME=ws --label io.containers.autoupdate=registry --pid host --privileged quay.io/cockpit/ws:latest /container/label-run
+
+[Install]
+WantedBy=default.target
+EOF
+
 ### set variant and url for unique identification
 sed -i 's|^HOME_URL=.*|HOME_URL="https://projectcayo.org"|' /usr/lib/os-release
 echo 'VARIANT="Cayo"' >> /usr/lib/os-release
