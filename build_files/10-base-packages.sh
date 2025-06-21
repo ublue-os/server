@@ -30,7 +30,9 @@ dnf -y install --setopt=install_weak_deps=False \
 
 dnf config-manager --set-disabled tailscale-stable
 
+# /*
 # Cockpit Web Service unit
+# */
 cat > /usr/lib/systemd/system/cockpit.service<<'EOF'
 [Unit]
 Description=Cockpit Container
