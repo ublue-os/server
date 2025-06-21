@@ -40,6 +40,7 @@ dnf -y install --setopt=install_weak_deps=False \
     qemu-guest-agent \
     samba \
     samba-usershares \
+    snapraid \
     tailscale \
     tmux \
     usbutils \
@@ -48,11 +49,6 @@ dnf -y install --setopt=install_weak_deps=False \
     xdg-user-dirs
 
 dnf config-manager --set-disabled tailscale-stable
-
-dnf -y copr enable ublue-os/staging
-dnf -y install snapraid
-# /* dnf -y install sanoid # Currently missing dependencies */
-dnf -y copr disable ublue-os/staging
 
 # /*
 # Cockpit Web Service unit
