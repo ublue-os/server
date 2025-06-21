@@ -1,10 +1,13 @@
-#!/usr/bin/env bash
 set -xeuo pipefail
 
+# /*
 # Get Kernel Version
+# */
 KERNEL_VRA="$(rpm -q "kernel" --queryformat '%{EVR}.%{ARCH}')"
 
+# /*
 ### install base server ZFS packages and sanoid dependencies
+# */
 dnf -y install \
     pv \
     /tmp/akmods-zfs-rpms/kmods/zfs/kmod-zfs-"${KERNEL_VRA}"-*.rpm \
@@ -16,5 +19,7 @@ dnf -y install \
     /tmp/akmods-zfs-rpms/kmods/zfs/zfs-*.rpm \
     /tmp/akmods-zfs-rpms/kmods/zfs/other/zfs-dracut-*.rpm
 
+# /*
 # depmod ran automatically with zfs 2.1 but not with 2.2
+# */
 depmod -a "${KERNEL_VRA}"
