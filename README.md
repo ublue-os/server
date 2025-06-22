@@ -58,3 +58,4 @@ The CPP conditional logic in the Containerfile provides several benefits.
 "Cayo" (KYE-oh) comes from "key" or "reef" in Spanish—think a solid foundation and unlocking potential.
 
 Conceptually, the "key" unlocks possibilities, and hints at islands that open up new horizons. "Reef" evokes a resilient, interconnected chain—strong and foundational, like a reef hosting diverse organisms. This fits the idea of a server hosting many services, which Cayo achieves through the stability and strength of an Enterprise Linux base hosting containerized applications.
+
