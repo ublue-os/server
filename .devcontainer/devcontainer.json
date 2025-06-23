@@ -30,8 +30,7 @@
                 "github.vscode-pull-request-github",
                 "hangxingliu.vscode-systemd-support",
                 "mads-hartmann.bash-ide-vscode",
-                "nefrob.vscode-just-syntax",
-                "timonwong.shellcheck"
+                "nefrob.vscode-just-syntax"
             ]
         }
     },

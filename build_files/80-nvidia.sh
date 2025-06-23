@@ -1,7 +1,8 @@
-#!/usr/bin/env bash
 set -xeuo pipefail
 
+# /*
 ### install base server NVIDIA packages
+# */
 dnf -y install /tmp/akmods-nv-rpms/ublue-os/ublue-os-nvidia-addons-*.rpm
 
 dnf config-manager --set-enabled epel-nvidia
@@ -15,3 +16,9 @@ dnf -y install \
 
 dnf config-manager --set-disabled epel-nvidia
 dnf config-manager --set-disabled nvidia-container-toolkit
+
+# /*
+### Nvidia specific configurations
+# */
+semodule --verbose --install /usr/share/selinux/packages/nvidia-container.pp
+systemctl preset ublue-nvctk-cdi.service
