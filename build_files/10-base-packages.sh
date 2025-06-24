@@ -34,6 +34,7 @@ dnf -y install --setopt=install_weak_deps=False \
     open-vm-tools \
     pcp-zeroconf \
     qemu-guest-agent \
+    snapraid \
     tailscale \
     tmux \
     usbutils \
@@ -43,10 +44,11 @@ dnf -y install --setopt=install_weak_deps=False \
 
 dnf config-manager --set-disabled tailscale-stable
 
-dnf -y copr enable ublue-os/staging
-dnf -y install snapraid
-# /* dnf -y install sanoid # Currently missing dependencies */
-dnf -y copr disable ublue-os/staging
+# /* Currently missing dependencies
+# dnf -y copr enable ublue-os/staging
+# dnf -y install sanoid
+# dnf -y copr disable ublue-os/staging
+# */
 
 # /*
 ### install packages direct from github
