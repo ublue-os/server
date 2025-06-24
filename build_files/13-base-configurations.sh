@@ -1,17 +1,13 @@
-set -eoux pipefail
+set -xeuo pipefail
 
 # /*
 ### OS Release
 # set variant and url for unique identification
+# NOTE: if VARIANT is added to CentOS the echos must become seds
 # */
 sed -i 's|^HOME_URL=.*|HOME_URL="https://projectcayo.org"|' /usr/lib/os-release
 echo 'VARIANT="Cayo"' >>/usr/lib/os-release
 echo 'VARIANT_ID="cayo"' >>/usr/lib/os-release
-# /*
-# if VARIANT ever gets added to CentOS we'll need these instead
-#sed -i 's|^VARIANT=.*|VARIANT="Cayo"|' /usr/lib/os-release
-#sed -i 's|^VARIANT_ID=.*|VARIANT_ID="cayo"|' /usr/lib/os-release
-# */
 
 # /*
 # set pretty name for base image
@@ -106,28 +102,3 @@ EOF
 cat >/usr/lib/tmpfiles.d/cayo-duperemove.conf <<'EOF'
 d /var/lib/duperemove - - - -
 EOF
-
-# /*
-### Cockpit Plugin
-# */
-
-# /*
-# add cockpit plugin for ZFS management
-# */
-curl --fail --retry 15 --retry-all-errors -sSL -o /tmp/cockpit-zfs-manager-api.json \
-    "https://api.github.com/repos/45Drives/cockpit-zfs-manager/releases/latest"
-CZM_TGZ_URL=$(jq -r .tarball_url /tmp/cockpit-zfs-manager-api.json)
-curl --fail --retry 15 --retry-all-errors -sSL -o /tmp/cockpit-zfs-manager.tar.gz "${CZM_TGZ_URL}"
-
-mkdir -p /tmp/cockpit-zfs-manager
-tar -zxvf /tmp/cockpit-zfs-manager.tar.gz -C /tmp/cockpit-zfs-manager --strip-components=1
-cp -a /tmp/cockpit-zfs-manager/polkit-1/actions/. /usr/share/polkit-1/actions/
-cp -a /tmp/cockpit-zfs-manager/polkit-1/rules.d/. /usr/share/polkit-1/rules.d/
-mv /tmp/cockpit-zfs-manager/zfs /usr/share/cockpit
-
-curl --fail --retry 15 --retry-all-errors -sSL -o /tmp/cockpit-zfs-manager-font-fix.sh \
-    https://raw.githubusercontent.com/45Drives/scripts/refs/heads/main/cockpit_font_fix/fix-cockpit.sh
-chmod +x /tmp/cockpit-zfs-manager-font-fix.sh
-/tmp/cockpit-zfs-manager-font-fix.sh
-
-rm -rf /tmp/cockpit-zfs-manager*
