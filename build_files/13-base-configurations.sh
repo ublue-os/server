@@ -59,7 +59,7 @@ L0nu7LfehYBEdj0ZaBIO6V2ej+Cx1uR7Cf4PKlLja/IAymEj6a8OJMN6+0pfX3u8
 DaO51gzKIn1Aumx5L76B64rp7LVWRpnwGPs=
 -----END CERTIFICATE-----
 EOF
-openssl x509 -inform pem -in /etc/pki/akmods/certs/akmods-ublue.pem -out /etc/pki/akmods/certs/akmods-ublue.der
+openssl x509 -inform PEM -outform DER -in /etc/pki/akmods/certs/akmods-ublue.pem -out /etc/pki/akmods/certs/akmods-ublue.der
 
 # /*
 ### Configuration
