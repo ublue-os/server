@@ -1,4 +1,4 @@
-set -eoux pipefail
+set -xeuo pipefail
 
 # /*
 ### OS Release

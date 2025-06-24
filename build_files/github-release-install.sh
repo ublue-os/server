@@ -40,7 +40,7 @@ else
   RELTAG="tags/${LATEST}"
 fi
 
-set -ouex pipefail
+set -xeuo pipefail
 
 API_JSON=$(mktemp /tmp/api-XXXXXXXX.json)
 API="https://api.github.com/repos/${ORG_PROJ}/releases/${RELTAG}"
