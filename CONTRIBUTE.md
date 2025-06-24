@@ -10,7 +10,7 @@ To build a Cayo image you need the following tools:
 - skopeo
 - yq
 
-Additionally, the following tools are used as well for development/testing:
+Additionally, the following tools are used for development/testing:
 - macadam
 - podman-machine
 - sed
