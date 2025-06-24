@@ -1,6 +1,11 @@
 set -eoux pipefail
 
 # /*
+# NOTE: LIBVIRT IS AN EXTENSION CANDIDATE
+# This will cease to exist when the extension is released.
+# */
+
+# /*
 # set pretty name for HCI image
 # */
 SOURCE_VERSION="$(grep ^VERSION_ID= /usr/lib/os-release | cut -f2 -d= | tr -d \")"

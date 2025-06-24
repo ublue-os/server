@@ -1,6 +1,10 @@
 set -xeuo pipefail
 
 # /*
+# NOTE: THIS IS AN EXTENSION CANDIDATE
+# */
+
+# /*
 # setup docker instead of moby-engine as in CoreOS
 # */
 dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo

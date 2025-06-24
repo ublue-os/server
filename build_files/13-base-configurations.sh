@@ -3,15 +3,11 @@ set -eoux pipefail
 # /*
 ### OS Release
 # set variant and url for unique identification
+# NOTE: if VARIANT is added to CentOS the echos must become seds
 # */
 sed -i 's|^HOME_URL=.*|HOME_URL="https://projectcayo.org"|' /usr/lib/os-release
 echo 'VARIANT="Cayo"' >>/usr/lib/os-release
 echo 'VARIANT_ID="cayo"' >>/usr/lib/os-release
-# /*
-# if VARIANT ever gets added to CentOS we'll need these instead
-#sed -i 's|^VARIANT=.*|VARIANT="Cayo"|' /usr/lib/os-release
-#sed -i 's|^VARIANT_ID=.*|VARIANT_ID="cayo"|' /usr/lib/os-release
-# */
 
 # /*
 # set pretty name for base image

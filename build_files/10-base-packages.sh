@@ -20,7 +20,6 @@ dnf -y copr disable ublue-os/packages
 dnf config-manager --add-repo https://pkgs.tailscale.com/stable/centos/"$(rpm -E %centos)"/tailscale.repo
 
 dnf -y install --setopt=install_weak_deps=False \
-    NetworkManager-wifi \
     cockpit-networkmanager \
     cockpit-podman \
     cockpit-selinux \
@@ -30,16 +29,11 @@ dnf -y install --setopt=install_weak_deps=False \
     duperemove \
     firewalld \
     hdparm \
-    iwlegacy-firmware \
-    iwlwifi-dvm-firmware \
-    iwlwifi-mvm-firmware \
     man-db \
     man-pages \
     open-vm-tools \
     pcp-zeroconf \
     qemu-guest-agent \
-    samba \
-    samba-usershares \
     tailscale \
     tmux \
     usbutils \
@@ -53,6 +47,13 @@ dnf -y copr enable ublue-os/staging
 dnf -y install snapraid
 # /* dnf -y install sanoid # Currently missing dependencies */
 dnf -y copr disable ublue-os/staging
+
+# /*
+### install packages direct from github
+### NOTE: ARM support will require use of proper arch rather than hard coding
+# */
+/run/build_files/github-release-install.sh rclone/rclone "linux-amd64"
+/run/build_files/github-release-install.sh trapexit/mergerfs "el$(rpm -E %centos).$(uname -m)"
 
 # /*
 # Cockpit Web Service unit
@@ -91,22 +92,3 @@ ExecStart=/usr/bin/podman run --name=ws --cidfile=%t/%N.cid --replace --rm --cgr
 [Install]
 WantedBy=default.target
 EOF
-
-# /*
-### set variant and url for unique identification
-# */
-sed -i 's|^HOME_URL=.*|HOME_URL="https://projectcayo.org"|' /usr/lib/os-release
-echo 'VARIANT="Cayo"' >> /usr/lib/os-release
-echo 'VARIANT_ID="cayo"' >> /usr/lib/os-release
-# /*
-# if VARIANT ever gets added to CentOS we'll need these instead
-#sed -i 's|^VARIANT=.*|VARIANT="Cayo"|' /usr/lib/os-release
-#sed -i 's|^VARIANT_ID=.*|VARIANT_ID="cayo"|' /usr/lib/os-release
-# */
-
-# /*
-### install packages direct from github
-### NOTE: ARM support will require use of proper arch rather than hard coding
-# */
-/run/build_files/github-release-install.sh rclone/rclone "linux-amd64"
-/run/build_files/github-release-install.sh trapexit/mergerfs "el$(rpm -E %centos).$(uname -m)"

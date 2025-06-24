@@ -1,6 +1,10 @@
 set -xeuo pipefail
 
 # /*
+# NOTE: THIS IS AN EXTENSION CANDIDATE
+# */
+
+# /*
 ### install virt server packages
 # */
 dnf -y copr enable ublue-os/packages
