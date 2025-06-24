@@ -338,9 +338,11 @@ push-to-registry $image $variant $flavor $version $destination="" $transport="":
 init-machine:
     #!/usr/bin/env bash
     set -ou pipefail
+    ram_size="$(( $(free --mega | awk '/^Mem:/{print $7}') / 2 ))"
+    ram_size="$(( ram_size >= 16384 ? 16384 : $(( ram_size >= 8192 ? 8192 : $(( ram_size >= 4096 ? 4096 : $(( ram_size >= 2048 ? 2048 : $(( ram_size >= 1024 ? 1024 : 0 )) )) )) )) ))"
     {{ podman-remote }} machine init \
         --rootful \
-        --memory $(( 1024 * 8 )) \
+        --memory "${ram_size}" \
         --volume "{{ justfile_dir() + ":" + justfile_dir() }}" \
         --volume "{{ env('HOME') + ":" + env('HOME') }}" 2>{{ builddir }}/error.log
     ec=$?
@@ -460,9 +462,12 @@ build-iso $image="" $variant="" $flavor="" $version="" $registry="": start-machi
         echo "{{ style('error') }}Error:{{ NORMAL }} Image \"$fq_name\" not in image-store" >&2
         exit 1
     fi
-    {{ podman-remote }} image exists $registry/$image_name:$version ||
-        {{ podman }} image scp $registry/$image_name:$version podman-machine-default-root::
-    
+    if ! {{ podman-remote }} image exists $registry/$image_name:$version; then
+        COPYTMP="$(mktemp -p {{ builddir }} -d -t podman_scp.XXXXXXXXXX)" && trap 'rm -rf $COPYTMP' EXIT SIGINT
+        TMPDIR="$COPYTMP" {{ podman }} image scp $registry/$image_name:$version podman-machine-default-root::
+        rm -rf "$COPYTMP"
+    fi
+
     # Pull Bootc Image Builder
     {{ podman-remote }} pull --retry 3 {{ bootc-image-builder }}
     

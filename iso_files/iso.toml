@@ -3,7 +3,14 @@ contents = """
 text
 autopart --type=lvm --fstype=xfs --noswap
 rootpw --lock
-%pre
+bootloader --append="console=tty0 console=ttyS0,115200"
+
+%post --erroronfail
+bootc switch --mutate-in-place<SIGPOLICY> --transport registry <URL>
+rm -f /var/lib/systemd/random-seed
+%end
+
+%post --erroronfail --nochroot
 mkdir -p /etc/pki/akmods/certs
 cat >/etc/pki/akmods/certs/akmods-ublue.pem <<'EOF'
 -----BEGIN CERTIFICATE-----
@@ -40,17 +47,8 @@ L0nu7LfehYBEdj0ZaBIO6V2ej+Cx1uR7Cf4PKlLja/IAymEj6a8OJMN6+0pfX3u8
 DaO51gzKIn1Aumx5L76B64rp7LVWRpnwGPs=
 -----END CERTIFICATE-----
 EOF
-openssl x509 -inform pem -in /etc/pki/akmods/certs/akmods-ublue.pem -out /etc/pki/akmods/certs/akmods-ublue.der
+openssl x509 -inform PEM -outform DER -in /etc/pki/akmods/certs/akmods-ublue.pem -out /etc/pki/akmods/certs/akmods-ublue.der
 
-%end
-%post --erroronfail
-
-bootc switch --mutate-in-place<SIGPOLICY> --transport registry <URL>
-rm -f /var/lib/systemd/random-seed
-
-%end
-
-%post --erroronfail --nochroot
 readonly ENROLLMENT_PASSWORD="universalblue"
 readonly SECUREBOOT_KEY="/etc/pki/akmods/certs/akmods-ublue.der"
 
@@ -72,9 +70,9 @@ enable = [
   "org.fedoraproject.Anaconda.Modules.Timezone",
   "org.fedoraproject.Anaconda.Modules.Users",
   "org.fedoraproject.Anaconda.Modules.Network",
-  "org.fedoraproject.Anaconda.Modules.Security",
-  "org.fedoraproject.Anaconda.Modules.Services",
 ]
 disable = [
+  "org.fedoraproject.Anaconda.Modules.Security",
+  "org.fedoraproject.Anaconda.Modules.Services",
   "org.fedoraproject.Anaconda.Modules.Subscription"
 ]
