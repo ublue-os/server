@@ -3,11 +3,17 @@ set -xeuo pipefail
 # /*
 ### OS Release
 # set variant and url for unique identification
-# NOTE: if VARIANT is added to CentOS the echos must become seds
+# NOTE: if VARIANT/DEFAULT_HOSTNAME is added to CentOS the echos must become seds
 # */
+sed -i 's|^Name=.*|Name="Cayo"|' /usr/lib/os-release
+sed -i "s|^Version=.*|Version=\"$IMAGE_VERSION\"" /usr/lib/os-release
+sed -i 's|^VENDOR_NAME=.*|VENDOR_NAME="Universal Blue"|' /usr/lib/os-release
+sed -i 's|^VENDOR_URL=.*|VENDOR_URL="www.universal-blue.org"|' /usr/lib/os-release
 sed -i 's|^HOME_URL=.*|HOME_URL="https://projectcayo.org"|' /usr/lib/os-release
+sed -i 's|^BUG_REPORT_URL=.*|BUG_REPORT_URL="https://github.com/ublue-os/cayo/issues"|' /usr/lib/os-release
+echo 'DEFAULT_HOSTNAME="cayo"' >>/usr/lib/os-release
 echo 'VARIANT="Cayo"' >>/usr/lib/os-release
-echo 'VARIANT_ID="cayo"' >>/usr/lib/os-release
+echo 'VARIANT_ID=cayo' >>/usr/lib/os-release
 
 # /*
 # set pretty name for base image
