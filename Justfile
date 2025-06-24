@@ -164,10 +164,11 @@ alias build := build-container
 [group('Container')]
 build-container $image="" $variant="" $flavor="" $version="":
     #!/usr/bin/env bash
-    set -xeou pipefail
     {{ default-inputs }}
     {{ just }} check-valid-image $image $variant $flavor $version
     {{ get-names }}
+    mkdir -p {{ builddir/'$image_name' }}
+    set -eou pipefail
     # Verify Source: do after upstream starts signing images
 
     # Tags
@@ -222,7 +223,7 @@ build-container $image="" $variant="" $flavor="" $version="":
             BUILD_ARGS+=("--cpp-flag=-D$FLAG=$image_registry/$image_org/akmods-nvidia:centos-stream$version")
             ;;
         *)
-            BUILD_ARGS+=("--cpp-flag=-D$FLAG=1")
+            BUILD_ARGS+=("--cpp-flag=-D$FLAG")
             ;;
         esac
     done
@@ -231,8 +232,25 @@ build-container $image="" $variant="" $flavor="" $version="":
     {{ podman }} pull --retry 3 "$source_image"
     {{ if flavor == 'nvidia' { podman + ' pull --retry 3 "$image_registry/$image_org/akmods-nvidia:centos-stream$version"' } else { '' } }}
 
+    # Render Containerfile
+    flags=()
+    for f in "${BUILD_ARGS[@]}"; do
+        if [[ "$f" =~ cpp-flag ]]; then
+            flags+=("${f#*flag=}")
+        fi
+    done
+    cpp -E Containerfile.in ${flags[@]} > {{ builddir / '$image_name/Containerfile' }}
+    labels="LABEL"
+    for l in "${LABELS[@]}"; do
+        if [[ "$l" != "--label" ]]; then
+            labels+=" $(jq -R <<< "${l%=*}")=$(jq -R <<< "${l#*=}")"
+        fi
+    done
+    echo "$labels" >> {{ builddir / '$image_name/Containerfile' }}
+    sed -i '/^$/d;/^#.*$/d' {{ builddir / '$image_name/Containerfile' }}
+
     # Build Image
-    {{ podman }} build -f Containerfile.in "${BUILD_ARGS[@]}" "${LABELS[@]}" "${TAGS[@]}" .
+    {{ podman }} build -f Containerfile.in "${BUILD_ARGS[@]}" "${LABELS[@]}" "${TAGS[@]}" {{ justfile_dir() }}
 
 # HHD-Dev Rechunk Image
 hhd-rechunk $image="" $variant="" $flavor="" $version="":
