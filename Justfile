@@ -13,6 +13,7 @@ flavor := "main"
 
 rechunker := shell("yq '.images.rechunker.source' images.yaml")
 bootc-image-builder := shell("yq '.images.bootc-image-builder.source' images.yaml")
+qemu := shell("yq '.images.qemu.source' images.yaml")
 
 _default:
     @just --list --unsorted
@@ -337,13 +338,15 @@ push-to-registry $image $variant $flavor $version $destination="" $transport="":
 init-machine:
     #!/usr/bin/env bash
     set -ou pipefail
-    {{ podman }} machine init \
+    ram_size="$(( $(free --mega | awk '/^Mem:/{print $7}') / 2 ))"
+    ram_size="$(( ram_size >= 16384 ? 16384 : $(( ram_size >= 8192 ? 8192 : $(( ram_size >= 4096 ? 4096 : $(( ram_size >= 2048 ? 2048 : $(( ram_size >= 1024 ? 1024 : 0 )) )) )) )) ))"
+    {{ podman-remote }} machine init \
         --rootful \
-        --memory $(( 1024 * 8 )) \
+        --memory "${ram_size}" \
         --volume "{{ justfile_dir() + ":" + justfile_dir() }}" \
-        --volume "{{ env('HOME') + ":" + env('HOME') }}" 2>>{{ builddir }}/error.log
+        --volume "{{ env('HOME') + ":" + env('HOME') }}" 2>{{ builddir }}/error.log
     ec=$?
-    if [ $ec = 125 ] && ! grep -q 'VM already exists' {{ builddir }}/error.log; then
+    if [ $ec != 0 ] && ! grep -q 'VM already exists' {{ builddir }}/error.log; then
         printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(tail -n1 {{ builddir }}/error.log | sed -E 's/Error:\s//')" >&2
         exit $ec
     fi
@@ -353,9 +356,9 @@ init-machine:
 start-machine: init-machine
     #!/usr/bin/env bash
     set -ou pipefail
-    {{ podman }} machine start 2>>{{ builddir }}/error.log
+    {{ podman }} machine start 2>{{ builddir }}/error.log
     ec=$?
-    if [ $ec = 125 ] && ! grep -q 'already running' {{ builddir }}/error.log; then
+    if [ $ec != 0 ] && ! grep -q 'already running' {{ builddir }}/error.log; then
         printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(tail -n1 {{ builddir }}/error.log | sed -E 's/Error:\s//')" >&2
         exit $ec
     fi
@@ -366,6 +369,7 @@ build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-mach
     {{ default-inputs }}
     : "${registry:=localhost}"
     {{ get-names }}
+    fq_name="$registry/$image_name:$version"
     set -eou pipefail
     # Create Build Dir
     mkdir -p {{ builddir }}/$image_name
@@ -375,8 +379,8 @@ build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-mach
     sed -i "s|<SSHPUBKEY>|$(cat {{ PUBKEY }})|" {{ builddir }}/$image_name/disk.toml
 
     # Load image into rootful podman-machine
-    if ! {{ podman }} image exists $registry/$image_name:$version; then
-        echo "{{ style('error') }}Error:{{ NORMAL }} Image \"$registry/$image_name:$version\" not in image-store" >&2
+    if ! {{ podman-remote }} image exists $fq_name && ! {{ podman }} image exists $fq_name; then
+        echo "{{ style('error') }}Error:{{ NORMAL }} Image \"$fq_name\" not in image-store" >&2
         exit 1
     fi
     if ! {{ podman-remote }} image exists $registry/$image_name:$version; then
@@ -399,11 +403,11 @@ build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-mach
         -v {{ builddir }}/$image_name:/output \
         -v /var/lib/containers/storage:/var/lib/containers/storage \
         quay.io/centos-bootc/bootc-image-builder:latest \
-        {{ if env('CI', '') != '' { '--progress verbose' } else { '--progress term' } }} \
+        {{ if env('CI', '') != '' { '--progress verbose' } else { '--progress auto'} }} \
         --type qcow2 \
         --use-librepo=True \
         --rootfs xfs \
-        $registry/$image_name:$version
+        $fq_name
 
 run-disk $image="" $variant="" $flavor="" $version="" $registry="":
     #!/usr/bin/env bash
@@ -417,19 +421,118 @@ run-disk $image="" $variant="" $flavor="" $version="" $registry="":
 
     {{ require('macadam') }} init \
         --ssh-identity-path {{ PRIVKEY }} \
-        --username root 2>>{{ builddir }}/error.log \
+        --username root 2>{{ builddir }}/error.log \
         {{ builddir }}/$image_name/qcow2/disk.qcow2
     ec=$?
-    if [ $ec = 125 ] && ! grep -q 'VM already exists' {{ builddir }}/error.log; then
+    if [ $ec != 0 ] && ! grep -q 'VM already exists' {{ builddir }}/error.log; then
         printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(tail -n1 {{ builddir }}/error.log | sed -E 's/Error:\s//')" >&2
     fi
 
     macadam start 2>>{{ builddir }}/error.log
     ec=$?
-    if [ $ec = 125 ] && ! grep -q 'already running' {{ builddir }}/error.log; then
+    if [ $ec != 0 ] && ! grep -q 'already running' {{ builddir }}/error.log; then
         printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(tail -n1 {{ builddir }}/error.log | sed -E 's/Error:\s//')" >&2
         printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(tail -n1 ${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/macadam/gvproxy.log)" >&2
         exit $?
     fi
     macadam ssh -- cat /etc/os-release
     macadam ssh -- systemctl status
+
+build-iso $image="" $variant="" $flavor="" $version="" $registry="": start-machine
+    #!/usr/bin/env bash
+    {{ default-inputs }}
+    : "${registry:=localhost}"
+    {{ get-names }}
+    fq_name="$registry/$image_name:$version"
+    set -eou pipefail
+    # Create Build Dir
+    mkdir -p build/$image_name
+
+    # Process Template
+    cp iso_files/iso.toml build/$image_name/iso.toml
+    sed -i "s|<URL>|$fq_name|" build/$image_name/iso.toml
+    if [[ $registry == "localhost" ]]; then
+        sed -i "s|<SIGPOLICY>||" build/$image_name/iso.toml
+    else
+        sed -i "s|<SIGPOLICY>| --enforce-container-sigpolicy|" build/$image_name/iso.toml
+    fi
+
+    # Load image into rootful podman-machine
+    if ! {{ podman-remote }} image exists $fq_name && ! {{ podman }} image exists $fq_name; then
+        echo "{{ style('error') }}Error:{{ NORMAL }} Image \"$fq_name\" not in image-store" >&2
+        exit 1
+    fi
+    if ! {{ podman-remote }} image exists $registry/$image_name:$version; then
+        COPYTMP="$(mktemp -p {{ builddir }} -d -t podman_scp.XXXXXXXXXX)" && trap 'rm -rf $COPYTMP' EXIT SIGINT
+        TMPDIR="$COPYTMP" {{ podman }} image scp $registry/$image_name:$version podman-machine-default-root::
+        rm -rf "$COPYTMP"
+    fi
+
+    # Pull Bootc Image Builder
+    {{ podman-remote }} pull --retry 3 {{ bootc-image-builder }}
+    
+    # Build ISO
+    {{ podman-remote }} run \
+        --rm \
+        -it \
+        --privileged \
+        --pull=newer \
+        --security-opt label=type:unconfined_t \
+        -v ./build/$image_name/iso.toml:/config.toml:ro \
+        -v ./build/$image_name:/output \
+        -v /var/lib/containers/storage:/var/lib/containers/storage \
+        quay.io/centos-bootc/bootc-image-builder:latest \
+        {{ if env('CI', '') != '' { '--progress verbose' } else { '--progress auto'} }} \
+        --type anaconda-iso \
+        --use-librepo=True \
+        $registry/$image_name:$version
+
+run-iso $image="" $variant="" $flavor="" $version="":
+    #!/usr/bin/env bash
+    {{ default-inputs }}
+    {{ get-names }}
+    set -xeuo pipefail
+    if [ ! -f build/$image_name/bootiso/install.iso ]; then
+        echo "{{ style('error') }}Error:{{ NORMAL }} Install ISO \"$image_name\" not built" >&2 && exit 1
+    fi
+    # Determine an available port to use
+    port=8006
+    while grep -q :${port} <<< $(ss -tunalp); do
+        port=$(( port + 1 ))
+    done
+    echo "Using Port: ${port}"
+    echo "Connect to http://localhost:${port}"
+
+    # Needs to be on the podman-machine due to dnsmasq requesting excessive UIDs/GIDs
+
+    # Ram Size
+    ram_size="$({{ podman-remote }} machine inspect | jq -r '.[].Resources.Memory')"
+    ram_size="$(( ram_size / 2))"
+    ram_size="$(( ram_size >= 8192 ? 8192 : $(( ram_size >= 4096 ? 4096 : $(( ram_size >= 2048 ? 2048 : $(( ram_size >= 1024 ? 1024 : 0 )) )) )) ))"
+    if [ $ram_size = "0" ]; then
+        echo "{{ style('error') }}Error:{{ NORMAL }} Not Enough Memory configured in podman machine" >&2 && exit 1
+    fi
+
+    # CPU Cores
+    cpu_cores="$(( $({{ podman-remote}} machine inspect | jq -r '.[].Resources.CPUs') / 2 ))"
+    cpu_cores="$(( cpu_cores > 0 ? cpu_cores : 1 ))"
+
+    # Pull qemu container
+    {{ podman-remote }} pull --retry 3 {{ qemu }}
+
+    # Set up the arguments for running the VM
+    run_args=()
+    run_args+=(--rm)
+    run_args+=(--publish "127.0.0.1:${port}:8006")
+    run_args+=(--env "CPU_CORES=$cpu_cores")
+    run_args+=(--env "RAM_SIZE=${ram_size}M")
+    run_args+=(--env "DISK_SIZE=20G")
+    run_args+=(--env "TPM=Y")
+    run_args+=(--env "BOOT_MODE=windows_secure")
+    run_args+=(--device=/dev/kvm)
+    run_args+=(--device=/dev/net/tun)
+    run_args+=(--cap-add NET_ADMIN)
+    run_args+=(--volume "./build/$image_name/bootiso/install.iso":"/boot.iso")
+
+    # Run the VM and open the browser to connect
+    {{ podman-remote }} run "${run_args[@]}" {{ qemu }}

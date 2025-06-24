@@ -47,3 +47,6 @@ images:
   bootc-image-builder:
     # TODO: Add Renovate Regex configuration
     source: quay.io/centos-bootc/bootc-image-builder:latest
+  qemu:
+    # TODO: Add Renovate Regex configuration
+    source: ghcr.io/qemus/qemu:7.12@sha256:ab767a6b9c8cf527d521eee9686dce09933bc35599ee58be364eb8f3a03001ea
