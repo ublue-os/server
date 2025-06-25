@@ -15,6 +15,10 @@ concurrency:
 jobs:
   build-push:
     name: build-push
+    continue-on-error: false
+    permissions:
+      contents: read
+      packages: write
     runs-on: ubuntu-24.04
     container:
       image: "ghcr.io/ublue-os/devcontainer:latest"
