@@ -25,11 +25,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       
-      - name: Run Dev Container
+      - name: Run Dev Container (TEST)
         uses: devcontainers/ci@v0.3
         with:
           cacheFrom: ghcr.io/ublue-os/devcontainer:latest
           push: never
+          configFile: ./.devcontainer.json
           runCmd: |
             just build
             just secureboot
