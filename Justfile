@@ -73,9 +73,9 @@ fi
 '
 [private]
 logsum := '''
-log_sum() { echo "$1" >> $GITHUB_STEP_SUMMARY; }
+log_sum() { echo "$1" >> ${GITHUB_STEP_SUMMARY:-/dev/stdout}; }
 log_sum "# Push to GHCR result"
-log_sum "```"
+log_sum "\`\`\`"
 '''
 
 [group('Utility')]
@@ -391,7 +391,7 @@ push-to-registry $image="" $variant="" $flavor="" $version="" $destination="" $t
         done
         {{ if env('CI', '') != '' { 'log_sum $destination/$image_name:$tag' } else { ''} }}
     done
-    {{ if env('CI', '') != '' { 'log_sum "```"' } else { '' } }}
+    {{ if env('CI', '') != '' { 'log_sum "\`\`\`"' } else { '' } }}
 
 # Podmaon Machine Init
 init-machine:
