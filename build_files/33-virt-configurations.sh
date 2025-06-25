@@ -1,4 +1,9 @@
-set -eoux pipefail
+set -xeuo pipefail
+
+# /*
+# NOTE: LIBVIRT IS AN EXTENSION CANDIDATE
+# This will cease to exist when the extension is released.
+# */
 
 # /*
 # set pretty name for HCI image

@@ -27,6 +27,20 @@ dnf -y remove \
   subscription-manager-rhsm-certificates
 
 # /*
+# remove any wifi support from base
+# */
+dnf -y remove \
+    atheros-firmware \
+    brcmfmac-firmware \
+    iwlegacy-firmware \
+    iwlwifi-dvm-firmware \
+    iwlwifi-mvm-firmware \
+    mt7xxx-firmware \
+    nxpwireless-firmware \
+    realtek-firmware \
+    tiwilink-firmware
+
+# /*
 # enable CRB, EPEL and other repos
 # */
 dnf config-manager --set-enabled crb
@@ -40,7 +54,6 @@ dnf -y upgrade epel-release
 dnf -y install --setopt=install_weak_deps=False \
   audit \
   git-core \
-  intel-compute-runtime \
   ipcalc \
   iscsi-initiator-utils \
   python3-dnf-plugin-versionlock \

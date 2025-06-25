@@ -1,30 +1,16 @@
-set -xeuo pipefail
+[customizations.installer.kickstart]
+contents = """
+text
+autopart --type=lvm --fstype=xfs --noswap
+rootpw --lock
+bootloader --append="console=tty0 console=ttyS0,115200"
 
-# /*
-### OS Release
-# set variant and url for unique identification
-# NOTE: if VARIANT/DEFAULT_HOSTNAME is added to CentOS the echos must become seds
-# */
-sed -i 's|^Name=.*|Name="Cayo"|' /usr/lib/os-release
-sed -i "s|^Version=.*|Version=\"$IMAGE_VERSION\"|" /usr/lib/os-release
-sed -i 's|^VENDOR_NAME=.*|VENDOR_NAME="Universal Blue"|' /usr/lib/os-release
-sed -i 's|^VENDOR_URL=.*|VENDOR_URL="www.universal-blue.org"|' /usr/lib/os-release
-sed -i 's|^HOME_URL=.*|HOME_URL="https://projectcayo.org"|' /usr/lib/os-release
-sed -i 's|^BUG_REPORT_URL=.*|BUG_REPORT_URL="https://github.com/ublue-os/cayo/issues"|' /usr/lib/os-release
-echo 'DEFAULT_HOSTNAME="cayo"' >>/usr/lib/os-release
-echo 'VARIANT="Cayo"' >>/usr/lib/os-release
-echo 'VARIANT_ID=cayo' >>/usr/lib/os-release
+%post --erroronfail
+bootc switch --mutate-in-place<SIGPOLICY> --transport registry <URL>
+rm -f /var/lib/systemd/random-seed
+%end
 
-# /*
-# set pretty name for base image
-# */
-SOURCE_VERSION="$(grep ^VERSION_ID= /usr/lib/os-release | cut -f2 -d= | tr -d \")"
-SOURCE_NAME="$(grep ^NAME= /usr/lib/os-release | cut -f2 -d= | tr -d \")"
-sed -i "s|^PRETTY_NAME=.*|PRETTY_NAME=\"Cayo (Version $IMAGE_VERSION / FROM $SOURCE_NAME $SOURCE_VERSION)\"|" /usr/lib/os-release
-
-# /*
-# AKMODS certificate
-# */
+%post --erroronfail --nochroot
 mkdir -p /etc/pki/akmods/certs
 cat >/etc/pki/akmods/certs/akmods-ublue.pem <<'EOF'
 -----BEGIN CERTIFICATE-----
@@ -63,48 +49,30 @@ DaO51gzKIn1Aumx5L76B64rp7LVWRpnwGPs=
 EOF
 openssl x509 -inform PEM -outform DER -in /etc/pki/akmods/certs/akmods-ublue.pem -out /etc/pki/akmods/certs/akmods-ublue.der
 
-# /*
-### Configuration
-# */
+readonly ENROLLMENT_PASSWORD="universalblue"
+readonly SECUREBOOT_KEY="/etc/pki/akmods/certs/akmods-ublue.der"
 
-# /*
-# Duperemove configuration
-# */
-cat >/etc/default/duperemove <<'EOF'
-HashDir=/var/lib/duperemove
-OPTIONS="--skip-zeroes --hash=xxhash"
-EOF
+if [[ ! -d "/sys/firmware/efi" ]]; then
+    echo "EFI mode not detected. Skipping key enrollment."
+    exit 0
+fi
 
-# /*
-### TMPFILES.D
-# */
+mokutil --timeout -1 || :
+echo -e "$ENROLLMENT_PASSWORD\n$ENROLLMENT_PASSWORD" | mokutil --import "$SECUREBOOT_KEY" || :
 
-# /*
-# Tmpfiles pcp
-# */
-cat >/usr/lib/tmpfiles.d/cayo-pcp.conf <<'EOF'
-d /var/lib/pcp/config/pmda 0775 pcp pcp -
-d /var/lib/pcp/config/pmie 0775 pcp pcp -
-d /var/lib/pcp/config/pmlogger 0775 pcp pcp -
-d /var/lib/pcp/tmp 0775 pcp pcp -
-d /var/lib/pcp/tmp/bash 0775 pcp pcp -
-d /var/lib/pcp/tmp/json 0775 pcp pcp -
-d /var/lib/pcp/tmp/mmv 0775 pcp pcp -
-d /var/lib/pcp/tmp/pmie 0775 pcp pcp -
-d /var/lib/pcp/tmp/pmlogger 0775 pcp pcp -
-d /var/lib/pcp/tmp/pmproxy 0775 pcp pcp -
-d /var/log/pcp 0775 pcp pcp -
-d /var/log/pcp/pmcd 0775 pcp pcp -
-d /var/log/pcp/pmfind 0775 pcp pcp -
-d /var/log/pcp/pmie 0775 pcp pcp -
-d /var/log/pcp/pmlogger 0775 pcp pcp -
-d /var/log/pcp/pmproxy 0775 pcp pcp -
-d /var/log/pcp/sa 0775 pcp pcp -
-EOF
+%end
+"""
 
-# /*
-# Tmpfiles duperemove
-# */
-cat >/usr/lib/tmpfiles.d/cayo-duperemove.conf <<'EOF'
-d /var/lib/duperemove - - - -
-EOF
+[customizations.installer.modules]
+enable = [
+  "org.fedoraproject.Anaconda.Modules.Localization",
+  "org.fedoraproject.Anaconda.Modules.Storage",
+  "org.fedoraproject.Anaconda.Modules.Timezone",
+  "org.fedoraproject.Anaconda.Modules.Users",
+  "org.fedoraproject.Anaconda.Modules.Network",
+]
+disable = [
+  "org.fedoraproject.Anaconda.Modules.Security",
+  "org.fedoraproject.Anaconda.Modules.Services",
+  "org.fedoraproject.Anaconda.Modules.Subscription"
+]

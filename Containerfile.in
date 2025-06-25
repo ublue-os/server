@@ -15,15 +15,6 @@ RUN --mount=type=cache,dst=/var/cache \
 ostree container commit
 RUNEOF
 
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=tmpfs,dst=/var/log \
-    --mount=type=tmpfs,dst=/var/tmp \
-    --mount=type=tmpfs,dst=/tmp \
-    bash <<'RUNEOF'
-#include "build_files/02-docker.sh"
-ostree container commit
-RUNEOF
-
 COPY build_files/github-release-install.sh /run/build_files/
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/var/log \

@@ -1,6 +1,10 @@
 set -xeuo pipefail
 
 # /*
+# NOTE: THIS IS AN EXTENSION CANDIDATE
+# */
+
+# /*
 ### install base server NVIDIA packages
 # */
 dnf -y install /tmp/akmods-nv-rpms/ublue-os/ublue-os-nvidia-addons-*.rpm

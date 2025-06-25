@@ -23,8 +23,11 @@ dnf -y install \
     kmod-mptsas \
     kmod-mptspi \
     kmod-ntfs3 \
-    kmod-qla2xxx \
-    kmod-vbox-guest-additions
+    kmod-qla2xxx
+
+# /* Broken
+#    kmod-vbox-guest-additions
+# */
 
 # /*
 # typically we disable extra repos, but like CRB and EPEL
