@@ -1,4 +1,6 @@
 ---
+name: Build Cayo
+run-name: Build Cayo by @${{ github.actor }}
 on:
   workflow_dispatch:
   schedule:
