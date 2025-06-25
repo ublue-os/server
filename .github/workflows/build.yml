@@ -39,12 +39,10 @@ jobs:
       - name: Secureboot Check
         run: just secureboot
 
-      - name: Login to GHCR
-        if: github.event_name != 'pull_request'
-        run: just login-to-ghcr ${{ github.actor }} ${{ github.token }}
-
       - name: Push and Sign Image
         if: github.event_name != 'pull_request'
-        run: just push-to-registry
+        run: |
+          just login-to-ghcr ${{ github.actor }} ${{ github.token }}
+          just push-to-registry
         env:
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}

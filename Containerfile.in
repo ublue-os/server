@@ -12,7 +12,6 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/tmp \
     bash <<'RUNEOF'
 #include "build_files/01-common.sh"
-ostree container commit
 RUNEOF
 
 COPY build_files/github-release-install.sh /run/build_files/
@@ -22,7 +21,6 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/tmp \
     bash <<'RUNEOF'
 #include "build_files/10-base-packages.sh"
-ostree container commit
 RUNEOF
 
 RUN --mount=type=cache,dst=/var/cache \
@@ -32,7 +30,6 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=bind,from=akmods_zfs,source=/kernel-rpms,dst=/tmp/kernel-rpms \
     bash <<'RUNEOF'
 #include "build_files/11-base-kernel-swap.sh"
-ostree container commit
 RUNEOF
 
 RUN --mount=type=cache,dst=/var/cache \
@@ -42,7 +39,6 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=bind,from=akmods_zfs,src=/rpms,dst=/tmp/akmods-zfs-rpms \
     bash <<'RUNEOF'
 #include "build_files/12-base-zfs.sh"
-ostree container commit
 RUNEOF
 
 RUN --mount=type=cache,dst=/var/cache \
@@ -51,7 +47,6 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/tmp \
     bash <<'RUNEOF'
 #include "build_files/12-base-kmods.sh"
-ostree container commit
 RUNEOF
 
 RUN --mount=type=cache,dst=/var/cache \
@@ -60,7 +55,6 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/tmp \
     bash <<'RUNEOF'
 #include "build_files/13-base-configurations.sh"
-ostree container commit
 RUNEOF
 
 #ifdef HCI
@@ -70,7 +64,6 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/tmp \
     bash <<'RUNEOF'
 #include "build_files/30-virt-packages.sh"
-ostree container commit
 RUNEOF
 
 RUN --mount=type=cache,dst=/var/cache \
@@ -79,7 +72,6 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/tmp \
     bash <<'RUNEOF'
 #include "build_files/33-virt-configurations.sh"
-ostree container commit
 RUNEOF
 #endif /* HCI */
 
@@ -91,7 +83,6 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=bind,from=akmods_nvidia,src=/rpms,dst=/tmp/akmods-nv-rpms \
     bash <<'RUNEOF'
 #include "build_files/80-nvidia.sh"
-ostree container commit
 RUNEOF
 #endif /* NVIDIA */
 
@@ -101,7 +92,6 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/tmp \
     bash <<'RUNEOF'
 #include "build_files/98-cleanup.sh"
-ostree container commit
 RUNEOF
 
 RUN bash <<'RUNEOF'
