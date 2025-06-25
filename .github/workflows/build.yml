@@ -1,0 +1,48 @@
+---
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 8 * * 0" # 0800 UTC Sunday
+  pull_request:
+    branches:
+      - main
+      - testing
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-push:
+    name: build-push
+    runs-on: ubuntu-24.04
+    container:
+      image: "ghcr.io/ublue-os/devcontainer:latest"
+      options: "--privileged --security-opt label=disable --user 0:0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Setup Just
+        uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3
+
+      - name: Setup Cosign
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3.9.1
+
+      - name: Build Image
+        run: just build
+
+      - name: Secureboot Check
+        run: just secureboot
+
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        run: just login-to-ghcr ${{ github.actor }} ${{ github.token }}
+
+      - name: Push and Sign Image
+        if: github.event_name != 'pull_request'
+        run: just push-to-registry
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
