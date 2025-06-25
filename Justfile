@@ -173,7 +173,7 @@ build-container $image="" $variant="" $flavor="" $version="":
     {{ default-inputs }}
     {{ just }} check-valid-image $image $variant $flavor $version
     {{ get-names }}
-    mkdir -p {{ builddir/'$image_name' }}
+    mkdir -p {{ builddir / '$image_name' }}
     set -eou pipefail
     # Verify Source: do after upstream starts signing images
 
@@ -370,8 +370,8 @@ push-to-registry $image="" $variant="" $flavor="" $version="" $destination="" $t
     #!/usr/bin/bash
     set -eou pipefail
 
-    {{ if env('COSIGN_PRIVATE_KEY', '') != '' { 'echo $COSIGN_PRIVATE_KEY > /run/cosign.key' } else { '' } }}
-    {{ if env('CI', '') != '' { logsum } else { ''} }}
+    {{ if env('COSIGN_PRIVATE_KEY', '') != '' { 'printf "%s" "$COSIGN_PRIVATE_KEY" > /tmp/cosign.key' } else { '' } }}
+    {{ if env('CI', '') != '' { logsum } else { '' } }}
 
     {{ default-inputs }}
     {{ get-names }}
@@ -384,12 +384,12 @@ push-to-registry $image="" $variant="" $flavor="" $version="" $destination="" $t
     declare -a TAGS=($({{ podman }} image list localhost/$image_name:$image_version --noheading --format 'table {{{{ .Tag }}'))
     for tag in "${TAGS[@]}"; do
         for i in {1..5}; do
-            {{ podman }} push {{ if env('COSIGN_PRIVATE_KEY', '') != '' { '--sign-by-sigstore-private-key=/run/cosign.key' } else { '' } }} "localhost/$image_name:$image_version" "$transport$destination/$image_name:$tag" 2>&1 && break || sleep $((5 * i));
+            {{ podman }} push {{ if env('COSIGN_PRIVATE_KEY', '') != '' { '--sign-by-sigstore-private-key=/tmp/cosign.key --sign-passphrase-file=/dev/null' } else { '' } }} "localhost/$image_name:$image_version" "$transport$destination/$image_name:$tag" 2>&1 && break || sleep $((5 * i));
             if [[ $i -eq '5' ]]; then
                 exit 1
             fi
         done
-        {{ if env('CI', '') != '' { 'log_sum $destination/$image_name:$tag' } else { ''} }}
+        {{ if env('CI', '') != '' { 'log_sum $destination/$image_name:$tag' } else { '' } }}
     done
     {{ if env('CI', '') != '' { 'log_sum "\`\`\`"' } else { '' } }}
 
@@ -462,7 +462,7 @@ build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-mach
         -v {{ builddir }}/$image_name:/output \
         -v /var/lib/containers/storage:/var/lib/containers/storage \
         quay.io/centos-bootc/bootc-image-builder:latest \
-        {{ if env('CI', '') != '' { '--progress verbose' } else { '--progress auto'} }} \
+        {{ if env('CI', '') != '' { '--progress verbose' } else { '--progress auto' } }} \
         --type qcow2 \
         --use-librepo=True \
         --rootfs xfs \
@@ -529,7 +529,7 @@ build-iso $image="" $variant="" $flavor="" $version="" $registry="": start-machi
 
     # Pull Bootc Image Builder
     {{ podman-remote }} pull --retry 3 {{ bootc-image-builder }}
-    
+
     # Build ISO
     {{ podman-remote }} run \
         --rm \
@@ -541,7 +541,7 @@ build-iso $image="" $variant="" $flavor="" $version="" $registry="": start-machi
         -v ./build/$image_name:/output \
         -v /var/lib/containers/storage:/var/lib/containers/storage \
         quay.io/centos-bootc/bootc-image-builder:latest \
-        {{ if env('CI', '') != '' { '--progress verbose' } else { '--progress auto'} }} \
+        {{ if env('CI', '') != '' { '--progress verbose' } else { '--progress auto' } }} \
         --type anaconda-iso \
         --use-librepo=True \
         $registry/$image_name:$version
@@ -573,7 +573,7 @@ run-iso $image="" $variant="" $flavor="" $version="":
     fi
 
     # CPU Cores
-    cpu_cores="$(( $({{ podman-remote}} machine inspect | jq -r '.[].Resources.CPUs') / 2 ))"
+    cpu_cores="$(( $({{ podman-remote }} machine inspect | jq -r '.[].Resources.CPUs') / 2 ))"
     cpu_cores="$(( cpu_cores > 0 ? cpu_cores : 1 ))"
 
     # Pull qemu container
