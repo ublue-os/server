@@ -189,7 +189,7 @@ build-container $image="" $variant="" $flavor="" $version="":
 
     # Labels
     IMAGE_VERSION="$image_version.$TIMESTAMP"
-    KERNEL_VERSION="$(skopeo inspect containers-storage:$image_registry/$image_org/akmods-zfs:centos-stream$version | jq -r '.Labels["ostree.linux"]')"
+    KERNEL_VERSION="$(podman inspect $image_registry/$image_org/akmods-zfs:centos-stream$version --format '{{{{ index .Labels "ostree.linux" }}')"
     LABELS=(
         "--label" "containers.bootc=1"
         "--label" "io.artifacthub.package.deprecated=false"
