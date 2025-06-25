@@ -355,8 +355,8 @@ secureboot image="" variant="" flavor="" version="":
 
 # Login to GHCR
 [group('CI')]
-@login-to-ghcr $user $token:
-    echo "$token" | {{ podman }} login ghcr.io -u "$user" --password-stdin
+@login-to-ghcr:
+    {{ podman }} login ghcr.io -u "$GITHUB_ACTOR"  -p "$GITHUB_TOKEN"
 
 # Push Images to Registry
 [group('CI')]

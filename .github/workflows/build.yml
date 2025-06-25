@@ -31,9 +31,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Mark Directory as Safe
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          git fetch --no-tags --prune --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+        run: git config --system --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Build Image
         run: just build
@@ -44,7 +42,9 @@ jobs:
       - name: Push and Sign Image
         if: github.event_name != 'pull_request'
         run: |
-          just login-to-ghcr ${{ github.actor }} ${{ github.token }}
+          just login-to-ghcr
           just push-to-registry
         env:
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
