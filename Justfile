@@ -381,7 +381,7 @@ push-to-registry $image="" $variant="" $flavor="" $version="" $destination="" $t
     : "${destination:=$image_registry/$image_org}"
     : "${transport:="docker://"}"
 
-    declare -a TAGS="($({{ podman }} image list localhost/$image_name:$image_version --noheading --format 'table {{{{ .Tag }}'))"
+    declare -a TAGS=($({{ podman }} image list localhost/$image_name:$image_version --noheading --format 'table {{{{ .Tag }}'))
     for tag in "${TAGS[@]}"; do
         for i in {1..5}; do
             {{ podman }} push {{ if env('COSIGN_PRIVATE_KEY', '') != '' { '--sign-by-sigstore-private-key=/run/cosign.key' } else { '' } }} "localhost/$image_name:$image_version" "$transport$destination/$image_name:$tag" 2>&1 && break || sleep $((5 * i));
