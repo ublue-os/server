@@ -71,6 +71,12 @@ if ! ' + podman + ' image exists "localhost/$image_name:$image_version"; then
     $cmd
 fi
 '
+[private]
+logsum := '''
+log_sum() { echo "$1" >> $GITHUB_STEP_SUMMARY; }
+log_sum "# Push to GHCR result"
+log_sum "```"
+'''
 
 [group('Utility')]
 check-valid-image $image="" $variant="" $flavor="" $version="":
@@ -189,7 +195,7 @@ build-container $image="" $variant="" $flavor="" $version="":
 
     # Labels
     IMAGE_VERSION="$image_version.$TIMESTAMP"
-    KERNEL_VERSION="$(skopeo inspect containers-storage:$image_registry/$image_org/akmods-zfs:centos-stream$version | jq -r '.Labels["ostree.linux"]')"
+    KERNEL_VERSION="$(podman inspect $image_registry/$image_org/akmods-zfs:centos-stream$version --format '{{{{ index .Labels "ostree.linux" }}')"
     LABELS=(
         "--label" "containers.bootc=1"
         "--label" "io.artifacthub.package.deprecated=false"
@@ -327,21 +333,50 @@ clean $image $variant $flavor $version $registry="":
         {{ podman }} rmi -f "${CLEAN[@]}"
     fi
 
+# Secureboot
+secureboot image="" variant="" flavor="" version="":
+    #!/usr/bin/bash
+    set -euo pipefail
+    {{ default-inputs }}
+    {{ just }} check-valid-image $image $variant $flavor $version
+    {{ get-names }}
+    mkdir -p {{ builddir / "$image_name" }}
+    cd {{ builddir / "$image_name" }}
+    set -x
+    kernel_release=$(podman inspect $image_name:$version --format '{{{{ index .Labels "ostree.linux" }}')
+    TMP=$(podman create localhost/$image_name:$version bash)
+    TMPDIR="$(mktemp -d -p .)"
+    trap 'rm -rf $TMPDIR' SIGINT EXIT
+    podman cp "$TMP":/usr/lib/modules/${kernel_release}/vmlinuz $TMPDIR/vmlinuz
+    podman rm -f $TMP
+    curl --retry 3 -Lo "$TMPDIR"/kernel-sign.der https://github.com/ublue-os/kernel-cache/raw/main/certs/public_key.der
+    curl --retry 3 -Lo "$TMPDIR"/akmods.der https://github.com/ublue-os/kernel-cache/raw/main/certs/public_key_2.der
+    openssl x509 -in "$TMPDIR"/kernel-sign.der -out "$TMPDIR"/kernel-sign.crt
+    openssl x509 -in "$TMPDIR"/akmods.der -out "$TMPDIR"/akmods.crt
+    sbverify --list $TMPDIR/vmlinuz
+    if ! sbverify --cert "$TMPDIR/kernel-sign.crt" "$TMPDIR/vmlinuz" || ! sbverify --cert "$TMPDIR/akmods.crt" "$TMPDIR/vmlinuz"; then
+        echo "Secureboot Signature Failed...."
+        exit 1
+    fi
+
 # Login to GHCR
 [group('CI')]
-@login-to-ghcr $user $token:
-    echo "$token" | {{ podman }} login ghcr.io -u "$user" --password-stdin
-    echo "$token" | docker login ghcr.io -u "$user" --password-stdin
+@login-to-ghcr:
+    {{ podman }} login ghcr.io -u "$GITHUB_ACTOR"  -p "$GITHUB_TOKEN"
 
 # Push Images to Registry
 [group('CI')]
-push-to-registry $image $variant $flavor $version $destination="" $transport="":
+push-to-registry $image="" $variant="" $flavor="" $version="" $destination="" $transport="":
     #!/usr/bin/bash
-    set ${SET_X:+-x} -eou pipefail
+    set -eou pipefail
+
+    {{ if env('COSIGN_PRIVATE_KEY', '') != '' { 'echo $COSIGN_PRIVATE_KEY > /run/cosign.key' } else { '' } }}
+    {{ if env('CI', '') != '' { logsum } else { ''} }}
 
     {{ default-inputs }}
     {{ get-names }}
-    {{ build-missing }}
+
+    set -x
 
     : "${destination:=$image_registry/$image_org}"
     : "${transport:="docker://"}"
@@ -349,8 +384,14 @@ push-to-registry $image $variant $flavor $version $destination="" $transport="":
     declare -a TAGS="($({{ podman }} image list localhost/$image_name:$image_version --noheading --format 'table {{{{ .Tag }}'))"
     for tag in "${TAGS[@]}"; do
         for i in {1..5}; do
-            {{ podman }} push "localhost/$image_name:$image_version" "$transport$destination/$image_name:$tag" 2>&1 && break || sleep $((5 * i));
+            {{ podman }} push {{ if env('COSIGN_PRIVATE_KEY', '') != '' { '--sign-by-sigstore-private-key=/run/cosign.key' } else { '' } }} "localhost/$image_name:$image_version" "$transport$destination/$image_name:$tag" 2>&1 && break || sleep $((5 * i));
+            if [[ $i -eq '5' ]]; then
+                exit 1
+            fi
         done
+        {{ if env('CI', '') != '' { 'log_sum $destination/$image_name:$tag' } else { ''} }}
+    done
+    {{ if env('CI', '') != '' { 'log_sum "```"' } else { '' } }}
 
 # Podmaon Machine Init
 init-machine:

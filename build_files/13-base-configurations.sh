@@ -6,7 +6,7 @@ set -xeuo pipefail
 # NOTE: if VARIANT/DEFAULT_HOSTNAME is added to CentOS the echos must become seds
 # */
 sed -i 's|^Name=.*|Name="Cayo"|' /usr/lib/os-release
-sed -i "s|^Version=.*|Version=\"$IMAGE_VERSION\"" /usr/lib/os-release
+sed -i "s|^Version=.*|Version=\"$IMAGE_VERSION\"|" /usr/lib/os-release
 sed -i 's|^VENDOR_NAME=.*|VENDOR_NAME="Universal Blue"|' /usr/lib/os-release
 sed -i 's|^VENDOR_URL=.*|VENDOR_URL="www.universal-blue.org"|' /usr/lib/os-release
 sed -i 's|^HOME_URL=.*|HOME_URL="https://projectcayo.org"|' /usr/lib/os-release

@@ -1,0 +1,50 @@
+---
+name: Build Cayo
+run-name: Build Cayo by @${{ github.actor }}
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 8 * * 0" # 0800 UTC Sunday
+  pull_request:
+    branches:
+      - main
+      - testing
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-push:
+    name: build-push
+    continue-on-error: false
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-24.04
+    container:
+      image: "ghcr.io/ublue-os/devcontainer:latest"
+      options: "--privileged --volume /var/lib/containers:/var/lib/containers --security-opt seccomp=unconfined --security-opt label=disable --user 0:0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Mark Directory as Safe
+        run: git config --system --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Build Image
+        run: just build
+
+      - name: Secureboot Check
+        run: just secureboot
+
+      - name: Push and Sign Image
+        if: github.event_name != 'pull_request'
+        run: |
+          just login-to-ghcr
+          just push-to-registry
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
