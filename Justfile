@@ -71,6 +71,12 @@ if ! ' + podman + ' image exists "localhost/$image_name:$image_version"; then
     $cmd
 fi
 '
+[private]
+logsum := '''
+log_sum() { echo "$1" >> $GITHUB_STEP_SUMMARY; }
+log_sum "# Push to GHCR result"
+log_sum "```"
+'''
 
 [group('Utility')]
 check-valid-image $image="" $variant="" $flavor="" $version="":
@@ -365,6 +371,7 @@ push-to-registry $image="" $variant="" $flavor="" $version="" $destination="" $t
     set -eou pipefail
 
     {{ if env('COSIGN_PRIVATE_KEY', '') != '' { 'echo $COSIGN_PRIVATE_KEY > /run/cosign.key' } else { '' } }}
+    {{ if env('CI', '') != '' { logsum } else { ''} }}
 
     {{ default-inputs }}
     {{ get-names }}
@@ -382,7 +389,9 @@ push-to-registry $image="" $variant="" $flavor="" $version="" $destination="" $t
                 exit 1
             fi
         done
+        {{ if env('CI', '') != '' { 'log_sum $destination/$image_name:$tag' } else { ''} }}
     done
+    {{ if env('CI', '') != '' { 'log_sum "```"' } else { '' } }}
 
 # Podmaon Machine Init
 init-machine:
