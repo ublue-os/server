@@ -20,29 +20,35 @@ jobs:
       contents: read
       packages: write
     runs-on: ubuntu-24.04
-    container:
-      image: "ghcr.io/ublue-os/devcontainer:latest"
-      options: "--privileged --security-opt label=disable --user 0:0"
 
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      
+      - name: Run Dev Container
+        uses: devcontainers/ci@v0.3
+        with:
+          cacheFrom: ghcr.io/ublue-os/devcontainer:latest
+          push: never
+          runCmd: |
+            just build
+            just secureboot
 
-      - name: Mark Directory as Safe
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          git fetch --no-tags --prune --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+      # - name: Mark Directory as Safe
+      #   run: |
+      #     git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      #     git fetch --no-tags --prune --depth=1 origin +refs/heads/main:refs/remotes/origin/main
 
-      - name: Build Image
-        run: just build
+      # - name: Build Image
+      #   run: just build
 
-      - name: Secureboot Check
-        run: just secureboot
+      # - name: Secureboot Check
+      #   run: just secureboot
 
-      - name: Push and Sign Image
-        if: github.event_name != 'pull_request'
-        run: |
-          just login-to-ghcr ${{ github.actor }} ${{ github.token }}
-          just push-to-registry
-        env:
-          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+      # - name: Push and Sign Image
+      #   if: github.event_name != 'pull_request'
+      #   run: |
+      #     just login-to-ghcr ${{ github.actor }} ${{ github.token }}
+      #     just push-to-registry
+      #   env:
+      #     COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
