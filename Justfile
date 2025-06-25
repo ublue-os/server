@@ -245,11 +245,11 @@ build-container $image="" $variant="" $flavor="" $version="":
             flags+=("${f#*flag=}")
         fi
     done
-    cpp -E Containerfile.in ${flags[@]} > {{ builddir / '$image_name/Containerfile' }}
+    {{ require('cpp') }} -E -traditional Containerfile.in ${flags[@]} > {{ builddir / '$image_name/Containerfile' }}
     labels="LABEL"
     for l in "${LABELS[@]}"; do
         if [[ "$l" != "--label" ]]; then
-            labels+=" $(jq -R <<< "${l%=*}")=$(jq -R <<< "${l#*=}")"
+            labels+=" $(jq -R <<< "${l%%=*}")=$(jq -R <<< "${l#*=}")"
         fi
     done
     echo "$labels" >> {{ builddir / '$image_name/Containerfile' }}
