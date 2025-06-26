@@ -253,6 +253,7 @@ build-container $image="" $variant="" $flavor="" $version="":
         fi
     done
     echo "$labels" >> {{ builddir / '$image_name/Containerfile' }}
+    sed -i "s/^ARG IMAGE_VERSION/ARG IMAGE_VERSION=\"$IMAGE_VERSION\"/" {{ builddir / '$image_name/Containerfile' }}
     sed -i '/^$/d;/^#.*$/d' {{ builddir / '$image_name/Containerfile' }}
 
     # Build Image
