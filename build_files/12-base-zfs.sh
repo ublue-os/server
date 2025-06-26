@@ -16,8 +16,7 @@ dnf -y install \
     /tmp/akmods-zfs-rpms/kmods/zfs/libzfs6-*.rpm \
     /tmp/akmods-zfs-rpms/kmods/zfs/libzpool6-*.rpm \
     /tmp/akmods-zfs-rpms/kmods/zfs/python3-pyzfs-*.rpm \
-    /tmp/akmods-zfs-rpms/kmods/zfs/zfs-*.rpm \
-    /tmp/akmods-zfs-rpms/kmods/zfs/other/zfs-dracut-*.rpm
+    /tmp/akmods-zfs-rpms/kmods/zfs/zfs-*.rpm
 
 # /*
 # depmod ran automatically with zfs 2.1 but not with 2.2
