@@ -2,11 +2,15 @@
 centos-10: &centos-10
   # TODO: Implement a Renovate Regex
   source: quay.io/centos-bootc/centos-bootc:stream10
+  zfs: ghcr.io/ublue-os/akmods-zfs:centos-stream10
   version: 10
+  cppFlags: ["CENTOS"]
 fedora-42: &fedora-42
   # TODO: Implement a Renovate Regex
   source: quay.io/fedora/fedora-bootc:42
+  zfs: ghcr.io/ublue-os/akmods-zfs:coreos-stable-42
   version: 42
+  cppFlags: ["FEDORA"]
 cayo-base: &cayo-base
   org: ublue-os
   registry: ghcr.io
@@ -14,13 +18,17 @@ cayo-base: &cayo-base
   cppFlags: []
   name: cayo
 
+defaults:
+  variant: fedora
+  version: 42
+
 images:
-  cayo-base-main-10:
+  cayo-centos-10:
     !!merge <<: 
       - *centos-10
       - *cayo-base
     description: "A bootc server image with ZFS included"
-  cayo-base-main-42:
+  cayo-fedora-42:
     !!merge <<:
       - *fedora-42
       - *cayo-base

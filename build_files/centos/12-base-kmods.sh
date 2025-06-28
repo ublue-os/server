@@ -1,7 +1,5 @@
 set -xeuo pipefail
 
-DIST=$(rpm -E %dist)
-if [[ "${DIST}" == ".el"* ]]; then
 # /*
 # enable Kmods SIG repos
 # */
@@ -35,4 +33,3 @@ dnf -y install \
 # typically we disable extra repos, but like CRB and EPEL
 # this repo is from CentOS so we leave it enabled
 # */
-fi
