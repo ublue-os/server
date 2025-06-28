@@ -1,4 +1,4 @@
-set -xeuo pipefail
+set ${CI:+-x} -euo pipefail
 
 # /*
 ### OS Release

@@ -2,7 +2,7 @@
 #shellcheck disable=SC1083
 # */
 
-set -xeuo pipefail
+set ${CI:+-x} -euo pipefail
 
 # /*
 ### Kernel Swap to Kernel signed with our MOK

@@ -167,7 +167,7 @@ build-container $variant="" $version="":
     {{ just }} check-valid-image $variant $version
     {{ get-names }}
     mkdir -p {{ builddir / '$variant-$version' }}
-    set -eoux pipefail
+    set ${CI:+-x} -eou pipefail
     # Verify Source: do after upstream starts signing images
 
     # Tags
@@ -253,7 +253,7 @@ hhd-rechunk $variant="" $version="":
     mkdir -p {{ builddir / '$variant-$version' }}
     {{ if shell('id -u') != '0' { podman + ' unshare -- ' + just + ' hhd-rechunk $variant $version; exit $?' } else { '' } }}
 
-    set -xeou pipefail
+    set ${CI:+-x} -eou pipefail
 
     # Labels
     VERSION="$({{ podman }} inspect localhost/$image_name:$version --format '{{{{ index .Config.Labels "org.opencontainers.image.version" }}')"
@@ -322,7 +322,7 @@ clean $variant $version $registry="":
 # Secureboot
 secureboot variant="" version="":
     #!/usr/bin/bash
-    set -euo pipefail
+    set ${CI:+-x} -euo pipefail
     {{ default-inputs }}
     {{ just }} check-valid-image $variant $version
     {{ get-names }}
@@ -354,7 +354,7 @@ secureboot variant="" version="":
 [group('CI')]
 push-to-registry $variant="" $version="" $destination="" $transport="":
     #!/usr/bin/bash
-    set -eou pipefail
+    set ${CI:+-x} -eou pipefail
 
     {{ if env('COSIGN_PRIVATE_KEY', '') != '' { 'printf "%s" "$COSIGN_PRIVATE_KEY" > /tmp/cosign.key' } else { '' } }}
     {{ if env('CI', '') != '' { logsum } else { '' } }}
@@ -536,7 +536,7 @@ run-iso $variant="" $version="":
     #!/usr/bin/env bash
     {{ default-inputs }}
     {{ get-names }}
-    set -xeuo pipefail
+    set -euo pipefail
     if [ ! -f {{ builddir / '$variant-$version/bootiso/install.iso' }} ]; then
         echo "{{ style('error') }}Error:{{ NORMAL }} Install ISO \"$image_name-$variant-$version\" not built" >&2 && exit 1
     fi

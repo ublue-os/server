@@ -2,7 +2,7 @@
 #shellcheck disable=SC2174,SC2114
 # */
 
-set -xeuo pipefail
+set ${CI:+-x} -euo pipefail
 
 # /*
 # See https://github.com/CentOS/centos-bootc/issues/191
