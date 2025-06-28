@@ -76,6 +76,17 @@ OPTIONS="--skip-zeroes --hash=xxhash"
 EOF
 
 # /*
+# Ensure systemd-resolved is enabled
+# */
+cat >/usr/lib/systemd/system-preset/91-cayo-resolved.preset <<'EOF'
+enable systemd-resolved.service
+EOF
+systemctl preset systemd-resolved.service
+cat >/usr/lib/tmpfiles.d/cayo-resolved.conf <<'EOF'
+L /etc/resolv.conf - - - - ../run/systemd/resolve/stub-resolv.conf
+EOF
+
+# /*
 ### TMPFILES.D
 # */
 
