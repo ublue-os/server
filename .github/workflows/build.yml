@@ -47,8 +47,8 @@ jobs:
       - name: Build Image
         run: just build
         env:
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
-          GITHUB_PR_NUMBER: ${{ github.event.pull_request }}
+          gha_event_name: ${{ github.event_name }}
+          gha_pr_number: ${{ github.event.pull_request }}
 
       - name: Secureboot Check
         run: just secureboot
