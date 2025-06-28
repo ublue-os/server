@@ -64,8 +64,11 @@ fi
 ### NOTE: ARM support will require use of proper arch rather than hard coding
 # */
 /run/build_files/github-release-install.sh rclone/rclone "linux-amd64"
-/run/build_files/github-release-install.sh trapexit/mergerfs "fc$(rpm -E %fedora).$(uname -m)"
-
+if [[ "${DIST}" == ".el"* ]]; then
+  /run/build_files/github-release-install.sh trapexit/mergerfs "el$(rpm -E %rhel).$(uname -m)"
+else
+  /run/build_files/github-release-install.sh trapexit/mergerfs "fc$(rpm -E %fedora).$(uname -m)"
+fi
 # /*
 # Cockpit Web Service unit
 # */
