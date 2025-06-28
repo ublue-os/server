@@ -40,9 +40,16 @@ dnf -y install --setopt=install_weak_deps=False \
   git-core \
   ipcalc \
   iscsi-initiator-utils \
-  python3-dnf-plugin-versionlock \
   rsync \
   ssh-key-dir
+
+# /*
+# Zram Generator
+# */
+cat >/usr/lib/systemd/zram-generator.conf <<'EOF'
+[zram0]
+zram-size = min(ram, 8192)
+EOF
 
 # /*
 # Configure Updates

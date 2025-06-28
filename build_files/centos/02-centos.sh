@@ -26,18 +26,15 @@ dnf -y install epel-release
 dnf -y upgrade epel-release
 
 # /*
-# Zram Generator
+# Install Packages
 # */
-cat >/usr/lib/systemd/zram-generator.conf <<'EOF'
-[zram0]
-zram-size = min(ram, 8192)
-EOF
+dnf -y --setopt=install_weak_deps=False install \
+    python3-dnf-plugin-versionlock \
+    systemd-resolved
 
 # /*
 # Ensure systemd-resolved is enabled
 # */
-dnf -y --setopt=install_weak_deps=False install systemd-resolved
-
 cat >/usr/lib/systemd/system-preset/91-cayo-resolved.preset <<'EOF'
 enable systemd-resolved.service
 EOF
