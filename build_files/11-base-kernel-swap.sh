@@ -16,9 +16,9 @@ popd
 KERNEL_VERSION="$(rpm -q 'kernel' | sed -E 's/kernel-//')"
 
 if [[ "${CACHED_VERSION}" == "$KERNEL_VERSION" ]]; then
-  dnf -y --allowerasing install /tmp/kernel-rpms/kernel-core-"$CACHED_VERSION".rpm
+  dnf -y install --allowerasing /tmp/kernel-rpms/kernel-core-"$CACHED_VERSION".rpm
 else
-  dnf -y --allowerasing install \
+  dnf -y install --allowerasing \
     /tmp/kernel-rpms/kernel-"$CACHED_VERSION".rpm \
     /tmp/kernel-rpms/kernel-core-"$CACHED_VERSION".rpm \
     /tmp/kernel-rpms/kernel-modules-"$CACHED_VERSION".rpm \

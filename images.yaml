@@ -1,20 +1,18 @@
 ---
 centos-10: &centos-10
   # TODO: Implement a Renovate Regex
-  source: quay.io/centos-bootc/centos-bootc:c10s
+  source: quay.io/centos-bootc/centos-bootc:stream10
   version: 10
-cayo: &cayo
+fedora-42: &fedora-42
+  # TODO: Implement a Renovate Regex
+  source: quay.io/fedora/fedora-bootc:42
+  version: 42
+cayo-base: &cayo-base
   org: ublue-os
   registry: ghcr.io
   repo: cayo
   cppFlags: []
-cayo-base: &cayo-base
-  <<: *cayo
   name: cayo
-cayo-hci: &cayo-hci
-  <<: *cayo
-  name: cayo-hci
-  cppFlags: [ HCI ]
 
 images:
   cayo-base-main-10:
@@ -22,25 +20,11 @@ images:
       - *centos-10
       - *cayo-base
     description: "A bootc server image with ZFS included"
-  cayo-hci-main-10:
-    !!merge <<: 
-      - *centos-10
-      - *cayo-hci
-    description: "A bootc Hyper-Converged Infrastructure image with ZFS included"
-  cayo-base-nvidia-10:
-    !!merge <<: 
-      - *centos-10
+  cayo-base-main-42:
+    !!merge <<:
+      - *fedora-42
       - *cayo-base
-    cppFlags: [ NVIDIA ]
-    description: "A bootc server image with ZFS and NVIDIA included"
-    name: cayo-nvidia
-  cayo-hci-nvidia-10:
-    !!merge <<: 
-      - *centos-10
-      - *cayo-hci
-    cppFlags: [ HCI, NVIDIA ]
-    description: "A bootc Hyper-Converged Infrastructure image with ZFS and NVIDIA included"
-    name: cayo-hci-nvidia
+    description: "A bootc server image with ZFS included"
   rechunker:
     # TODO: Add Renovate Regex configuration
     source: ghcr.io/hhd-dev/rechunk:v1.2.2@sha256:e799d89f9a9965b5b0e89941a9fc6eaab62e9d2d73a0bfb92e6a495be0706907

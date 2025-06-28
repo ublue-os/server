@@ -17,35 +17,40 @@ rm -rf /opt /usr/local
 ln -sf var/opt /opt
 ln -sf ../var/usrlocal /usr/local
 
-# /*
-# remove subscription manager
-# */
-dnf -y remove \
-  libdnf-plugin-subscription-manager \
-  python3-subscription-manager-rhsm \
-  subscription-manager \
-  subscription-manager-rhsm-certificates
+DIST=$(rpm -E %dist)
+if [[ "${DIST}" == ".el"* ]]; then
+  # /*
+  # remove subscription manager
+  # */
+  dnf -y remove \
+    libdnf-plugin-subscription-manager \
+    python3-subscription-manager-rhsm \
+    subscription-manager \
+    subscription-manager-rhsm-certificates
+
+  # /*
+  # enable CRB, EPEL and other repos
+  # */
+  dnf config-manager --set-enabled crb
+  dnf -y install epel-release
+  dnf -y upgrade epel-release
+else
+  dnf -y install dnf5-plugins
+fi
 
 # /*
 # remove any wifi support from base
 # */
 dnf -y remove \
-    atheros-firmware \
-    brcmfmac-firmware \
-    iwlegacy-firmware \
-    iwlwifi-dvm-firmware \
-    iwlwifi-mvm-firmware \
-    mt7xxx-firmware \
-    nxpwireless-firmware \
-    realtek-firmware \
-    tiwilink-firmware
-
-# /*
-# enable CRB, EPEL and other repos
-# */
-dnf config-manager --set-enabled crb
-dnf -y install epel-release
-dnf -y upgrade epel-release
+  atheros-firmware \
+  brcmfmac-firmware \
+  iwlegacy-firmware \
+  iwlwifi-dvm-firmware \
+  iwlwifi-mvm-firmware \
+  mt7xxx-firmware \
+  nxpwireless-firmware \
+  realtek-firmware \
+  tiwilink-firmware
 
 # /*
 # packages which are more or less what we'd find in CoreOS

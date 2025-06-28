@@ -17,7 +17,12 @@ dnf -y copr disable ublue-os/packages
 # /*
 ### server base packages which are mostly what we added in ucore-minimal
 # */
-dnf config-manager --add-repo https://pkgs.tailscale.com/stable/centos/"$(rpm -E %centos)"/tailscale.repo
+DIST=$(rpm -E %dist)
+if [[ "${DIST}" == ".el"* ]]; then
+  dnf config-manager --add-repo https://pkgs.tailscale.com/stable/centos/"$(rpm -E %centos)"/tailscale.repo
+else
+  dnf config-manager addrepo --from-repofile=https://pkgs.tailscale.com/stable/fedora/tailscale.repo
+fi
 
 dnf -y install --setopt=install_weak_deps=False \
     cockpit-networkmanager \
@@ -42,7 +47,11 @@ dnf -y install --setopt=install_weak_deps=False \
     xdg-dbus-proxy \
     xdg-user-dirs
 
-dnf config-manager --set-disabled tailscale-stable
+if [[ "${DIST}" == ".el"* ]]; then
+  dnf config-manager --set-disabled tailscale-stable
+else
+  dnf config-manager setopt tailscale-stable.enabled=0
+fi
 
 # /* Currently missing dependencies
 # dnf -y copr enable ublue-os/staging
@@ -55,7 +64,7 @@ dnf config-manager --set-disabled tailscale-stable
 ### NOTE: ARM support will require use of proper arch rather than hard coding
 # */
 /run/build_files/github-release-install.sh rclone/rclone "linux-amd64"
-/run/build_files/github-release-install.sh trapexit/mergerfs "el$(rpm -E %centos).$(uname -m)"
+/run/build_files/github-release-install.sh trapexit/mergerfs "fc$(rpm -E %fedora).$(uname -m)"
 
 # /*
 # Cockpit Web Service unit

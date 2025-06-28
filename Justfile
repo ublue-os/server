@@ -190,12 +190,20 @@ build-container $image="" $variant="" $flavor="" $version="":
         TAGS+=("--tag" "localhost/$image_name:$tag")
     done
 
+    if [[ "$source_image" == *"centos"* ]]; then
+        export AKMODS_ZFS_IMAGE="akmods-zfs:centos-stream$version"
+    elif [[ "$source_image" == *"fedora"* ]]; then
+        export AKMODS_ZFS_IMAGE="akmods-zfs:coreos-stable-$version"
+    else
+        echo "Invalid source image for akmods-zfs: $source_image"
+        exit 1
+    fi
     # Pull akmods-zfs image with retry as we always need it for kernel and ZFS
-    {{ podman }} pull --retry 3 "$image_registry/$image_org/akmods-zfs:centos-stream$version"
+    {{ podman }} pull --retry 3 "$image_registry/$image_org/$AKMODS_ZFS_IMAGE"
 
     # Labels
     IMAGE_VERSION="$image_version.$TIMESTAMP"
-    KERNEL_VERSION="$(podman inspect $image_registry/$image_org/akmods-zfs:centos-stream$version --format '{{{{ index .Labels "ostree.linux" }}')"
+    KERNEL_VERSION="$(podman inspect $image_registry/$image_org/$AKMODS_ZFS_IMAGE --format '{{{{ index .Labels "ostree.linux" }}')"
     LABELS=(
         "--label" "containers.bootc=1"
         "--label" "io.artifacthub.package.deprecated=false"
@@ -221,7 +229,7 @@ build-container $image="" $variant="" $flavor="" $version="":
         "--device" "/dev/fuse"
         "--build-arg=IMAGE_VERSION=$IMAGE_VERSION"
         "--cpp-flag=-DSOURCE_IMAGE=$source_image"
-        "--cpp-flag=-DZFS=$image_registry/$image_org/akmods-zfs:centos-stream$version"
+        "--cpp-flag=-DZFS=$image_registry/$image_org/$AKMODS_ZFS_IMAGE"
     )
     for FLAG in $image_cpp_flags; do
         case "${FLAG:-}" in
