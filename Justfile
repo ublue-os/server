@@ -324,7 +324,7 @@ secureboot variant="" version="":
     #!/usr/bin/bash
     set -euo pipefail
     {{ default-inputs }}
-    {{ just }} check-valid-image $image $variant $flavor $version
+    {{ just }} check-valid-image $variant $version
     {{ get-names }}
     mkdir -p {{ builddir / '$variant-$version' }}
     cd {{ builddir / '$variant-$version' }}

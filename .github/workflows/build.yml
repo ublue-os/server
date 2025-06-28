@@ -16,15 +16,26 @@ concurrency:
 
 jobs:
   build-push:
-    name: build-push
+    name: build-push ${{ matrix.variant }}-${{ matrix.version }}
     continue-on-error: false
     permissions:
       contents: read
       packages: write
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: centos
+            version: 10
+          - variant: fedora
+            version: 42
     container:
       image: "ghcr.io/ublue-os/devcontainer:latest"
       options: "--privileged --volume /var/lib/containers:/var/lib/containers --security-opt seccomp=unconfined --security-opt label=disable --user 0:0"
+    env:
+      CAYO_VARIANT: ${{ matrix.variant }}
+      CAYO_VERSION: ${{ matrix.version }}
 
     steps:
       - name: Checkout
