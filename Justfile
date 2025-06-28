@@ -84,23 +84,22 @@ check-valid-image $variant="" $version="":
 [group('Utility')]
 gen-tags $variant="" $version="":
     #!/usr/bin/env bash
-    set -e
+    set ${CI:+-x} -eou pipefail
     {{ default-inputs }}
     {{ get-names }}
     # Generate Timestamp with incrementing version point
     TIMESTAMP="$(date +%Y%m%d)"
-    #LIST_TAGS="$(mktemp)"
-    # TODO: some work we can do here to check the version in the CentOS labels
-    #while [[ ! -s "$LIST_TAGS" ]]; do
-    #    skopeo list-tags docker://registry/$image_name > "$LIST_TAGS"
-    #done
-    #if [[ $(cat "$LIST_TAGS" | jq "any(.Tags[]; contains(\"$image_version-$TIMESTAMP\"))") == "true" ]]; then
-    #    POINT="1"
-    #    while $(cat "$LIST_TAGS" | jq -e "any(.Tags[]; contains(\"$image_version-$TIMESTAMP.$POINT\"))")
-    #    do
-    #        (( POINT++ ))
-    #    done
-    #fi
+    LIST_TAGS="$(mktemp)"
+    while [[ ! -s "$LIST_TAGS" ]]; do
+       skopeo list-tags docker://$image_registry/$image_org/$image_name > "$LIST_TAGS"
+    done
+    if [[ $(cat "$LIST_TAGS" | jq "any(.Tags[]; contains(\"$image_version-$TIMESTAMP\"))") == "true" ]]; then
+       POINT="1"
+       while $(cat "$LIST_TAGS" | jq -e "any(.Tags[]; contains(\"$image_version-$TIMESTAMP.$POINT\"))")
+       do
+           (( POINT++ ))
+       done
+    fi
 
     if [[ -n "${POINT:-}" ]]; then
         TIMESTAMP="$TIMESTAMP.$POINT"
