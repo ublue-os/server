@@ -110,6 +110,9 @@ gen-tags $variant="" $version="":
 
     # Define Versions
     COMMIT_TAGS=("$image_version" "$SHA_SHORT-$image_version")
+    if [[ -n "{$GITHUB_PR_NUMBER:-}" ]]; then
+        COMMIT_TAGS+=("pr-$image_version-$GITHUB_PR_NUMBER")
+    fi
     BUILD_TAGS=("$image_version" "$image_version-$TIMESTAMP")
 
     declare -A output
@@ -171,7 +174,7 @@ build-container $variant="" $version="":
 
     # Tags
     declare -A gen_tags="($({{ just }} gen-tags $variant $version))"
-    if [[ "${github:-}" =~ pull_request ]]; then
+    if [[ "${GITHUB_EVENT_NAME:-}" =~ pull_request ]]; then
         tags=(${gen_tags["COMMIT_TAGS"]})
     else
         tags=(${gen_tags["BUILD_TAGS"]})
