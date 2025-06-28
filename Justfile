@@ -84,9 +84,9 @@ check-valid-image $variant="" $version="":
 [group('Utility')]
 gen-tags $variant="" $version="":
     #!/usr/bin/env bash
-    set ${CI:+-x} -eou pipefail
     {{ default-inputs }}
     {{ get-names }}
+    set ${CI:+-x} -eou pipefail
     # Generate Timestamp with incrementing version point
     TIMESTAMP="$(date +%Y%m%d)"
     LIST_TAGS="$(mktemp)"
@@ -109,9 +109,9 @@ gen-tags $variant="" $version="":
     SHA_SHORT="$(git rev-parse --short HEAD)"
 
     # Define Versions
-    COMMIT_TAGS=("$image_version" "$SHA_SHORT-$image_version")
-    if [[ -n "{$GITHUB_PR_NUMBER:-}" ]]; then
-        COMMIT_TAGS+=("pr-$image_version-$GITHUB_PR_NUMBER")
+    COMMIT_TAGS=()
+    if [[ -n "{{ env('GITHUB_PR_NUMBER', '') }}" ]]; then
+        COMMIT_TAGS=("$image_version" "pr-$image_version-$SHA_SHORT" "pr-$image_version-{{ env('GITHUB_PR_NUMBER', '') }}")
     fi
     BUILD_TAGS=("$image_version" "$image_version-$TIMESTAMP")
 
@@ -174,7 +174,7 @@ build-container $variant="" $version="":
 
     # Tags
     declare -A gen_tags="($({{ just }} gen-tags $variant $version))"
-    if [[ "${GITHUB_EVENT_NAME:-}" =~ pull_request ]]; then
+    if [[ "{{ env('GITHUB_EVENT_NAME', '') }}" =~ pull_request ]]; then
         tags=(${gen_tags["COMMIT_TAGS"]})
     else
         tags=(${gen_tags["BUILD_TAGS"]})
@@ -324,13 +324,12 @@ clean $variant $version $registry="":
 # Secureboot
 secureboot variant="" version="":
     #!/usr/bin/bash
-    set ${CI:+-x} -euo pipefail
     {{ default-inputs }}
     {{ just }} check-valid-image $variant $version
     {{ get-names }}
     mkdir -p {{ builddir / '$variant-$version' }}
     cd {{ builddir / '$variant-$version' }}
-    set -x
+    set ${CI:+-x} -euo pipefail
     kernel_release=$({{ podman }} inspect $image_name:$version --format '{{{{ index .Labels "ostree.linux" }}')
     TMP=$({{ podman }} create localhost/$image_name:$version bash)
     TMPDIR="$(mktemp -d -p .)"
@@ -356,15 +355,13 @@ secureboot variant="" version="":
 [group('CI')]
 push-to-registry $variant="" $version="" $destination="" $transport="":
     #!/usr/bin/bash
-    set ${CI:+-x} -eou pipefail
-
     {{ if env('COSIGN_PRIVATE_KEY', '') != '' { 'printf "%s" "$COSIGN_PRIVATE_KEY" > /tmp/cosign.key' } else { '' } }}
     {{ if env('CI', '') != '' { logsum } else { '' } }}
 
     {{ default-inputs }}
     {{ get-names }}
 
-    set -x
+    set ${CI:+-x} -eou pipefail
 
     : "${destination:=$image_registry/$image_org}"
     : "${transport:="docker://"}"
