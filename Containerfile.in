@@ -12,6 +12,11 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/tmp \
     bash <<'RUNEOF'
 #include "build_files/01-common.sh"
+#ifdef CENTOS
+#include "build_files/centos/02-centos.sh"
+#else 
+#include "build_files/fedora/02-fedora.sh"
+#endif /* CENTOS */
 ostree container commit
 RUNEOF
 
@@ -22,6 +27,11 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/tmp \
     bash <<'RUNEOF'
 #include "build_files/10-base-packages.sh"
+#ifdef CENTOS
+#include "build_files/centos/10-base-packages.sh"
+#else 
+#include "build_files/fedora/10-base-packages.sh"
+#endif /* CENTOS */
 ostree container commit
 RUNEOF
 
@@ -45,14 +55,16 @@ RUN --mount=type=cache,dst=/var/cache \
 ostree container commit
 RUNEOF
 
+#ifdef CENTOS
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/var/log \
     --mount=type=tmpfs,dst=/var/tmp \
     --mount=type=tmpfs,dst=/tmp \
     bash <<'RUNEOF'
-#include "build_files/12-base-kmods.sh"
+#include "build_files/centos/12-base-kmods.sh"
 ostree container commit
 RUNEOF
+#endif /* CENTOS */
 
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/var/log \
@@ -62,38 +74,6 @@ RUN --mount=type=cache,dst=/var/cache \
 #include "build_files/13-base-configurations.sh"
 ostree container commit
 RUNEOF
-
-#ifdef HCI
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=tmpfs,dst=/var/log \
-    --mount=type=tmpfs,dst=/var/tmp \
-    --mount=type=tmpfs,dst=/tmp \
-    bash <<'RUNEOF'
-#include "build_files/30-virt-packages.sh"
-ostree container commit
-RUNEOF
-
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=tmpfs,dst=/var/log \
-    --mount=type=tmpfs,dst=/var/tmp \
-    --mount=type=tmpfs,dst=/tmp \
-    bash <<'RUNEOF'
-#include "build_files/33-virt-configurations.sh"
-ostree container commit
-RUNEOF
-#endif /* HCI */
-
-#ifdef NVIDIA
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=tmpfs,dst=/var/log \
-    --mount=type=tmpfs,dst=/var/tmp \
-    --mount=type=tmpfs,dst=/tmp \
-    --mount=type=bind,from=akmods_nvidia,src=/rpms,dst=/tmp/akmods-nv-rpms \
-    bash <<'RUNEOF'
-#include "build_files/80-nvidia.sh"
-ostree container commit
-RUNEOF
-#endif /* NVIDIA */
 
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/var/log \
