@@ -2,7 +2,7 @@
 #shellcheck disable=SC2174
 # */
 
-set ${CI:+-x} -euo pipefail
+set -xeuo pipefail
 
 # /*
 # See https://github.com/CentOS/centos-bootc/issues/191
@@ -26,20 +26,6 @@ dnf -y install epel-release
 dnf -y upgrade epel-release
 
 # /*
-# packages which are more or less what we'd find in CoreOS
-# other than ignition, coreos-installer, moby-engine, etc
-# */
-dnf -y install --setopt=install_weak_deps=False \
-  audit \
-  git-core \
-  ipcalc \
-  iscsi-initiator-utils \
-  python3-dnf-plugin-versionlock \
-  rsync \
-  ssh-key-dir \
-  systemd-resolved
-
-# /*
 # Zram Generator
 # */
 cat >/usr/lib/systemd/zram-generator.conf <<'EOF'
@@ -50,6 +36,8 @@ EOF
 # /*
 # Ensure systemd-resolved is enabled
 # */
+dnf -y --setopt=install_weak_deps=False install systemd-resolved
+
 cat >/usr/lib/systemd/system-preset/91-cayo-resolved.preset <<'EOF'
 enable systemd-resolved.service
 EOF

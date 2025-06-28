@@ -32,6 +32,19 @@ dnf -y remove \
   tiwilink-firmware
 
 # /*
+# packages which are more or less what we'd find in CoreOS
+# other than ignition, coreos-installer, moby-engine, etc
+# */
+dnf -y install --setopt=install_weak_deps=False \
+  audit \
+  git-core \
+  ipcalc \
+  iscsi-initiator-utils \
+  python3-dnf-plugin-versionlock \
+  rsync \
+  ssh-key-dir
+
+# /*
 # Configure Updates
 # */
 sed -i 's|^ExecStart=.*|ExecStart=/usr/bin/bootc update --quiet|' /usr/lib/systemd/system/bootc-fetch-apply-updates.service
