@@ -39,7 +39,7 @@ This will build a `cayo:42` image from Fedora 42, which is the default of `just 
 ```bash
 just build centos 10
 ```
-Which will build a `cayo:10` image from Centos 10.
+Which will build a `cayo:10` image from CentOS 10.
 
 
 To see what the available recipes are and their parameters just run:
