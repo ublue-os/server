@@ -26,15 +26,21 @@ Cayo uses `just` with recipes defined in the `Justfile` to build and test images
 just build cayo
 ```
 Which will build the base Cayo image. Several of the recipes accept parameters. For `just build` the following parameters (in order):
-- "image" (Always Cayo right now)
-- "variant" (base and hci)
-- "flavor" (main and nvidia)
-- "version" (Currently only 10)
+
+- "variant" (centos and fedora)
+- "version" (10 and 42, current centos and fedora versions)
+
 At any time you can pass an empty string `""` to use the default value for that parameter:
 ```bash
-just build "" hci "" 10
+just build fedora 42
 ```
-Which will build a `cayo-hci:10` image.
+This will build a `cayo:42` image from Fedora 42, which is the default of `just build`.
+
+```bash
+just build centos 10
+```
+Which will build a `cayo:10` image from Centos 10.
+
 
 To see what the available recipes are and their parameters just run:
 ```bash
@@ -43,7 +49,7 @@ just
 To get an overview of what's available. Reminder, parameters in `just` are positional and do not have a key/value pair on the commandline.
 
 ## Testing Cayo
-Currently, Cayo does not have an active CI pipeline. This issue is tracked in [#15](https://github.com/ublue-os/cayo/issues/15). Once the workflows are active, images will be built on each PR. However, you can test locally before submitting your PR. There are two primary methods for doing local testing: Container Testing and VM Testing.
+Currently, Cayo's CI pipeline builds images in each PR. However, you can test locally before submitting your PR. There are two primary methods for doing local testing: Container Testing and VM Testing.
 
 ### Container Testing
 Often, the changes we are making do not require a fully running system. In this case, we can use `just run-container` to do a `podman run` of your Container Image. You will be dropped into bash shell inside the Container and will be able to inspect the filesystem. This is useful if you are adding a file, or making some other static change to the Image. When you exit the Container, `podman` will clean it up for you.
@@ -83,4 +89,4 @@ We use `cpp` to preprocess the Containerfile. `podman` and `buildah` both have d
 # My Comment is Here
 # */
 ```
-3. To view a rendered Containerfile, they are located under the `build/$image_name/Containerfile`
+3. To view a rendered Containerfile, they are located under the `build/$variant-$version/Containerfile`
