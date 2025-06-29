@@ -17,7 +17,7 @@ Similarities to uCore:
 Differences from uCore:
 
 - built on bootc not CoreOS
-- built on CentOS with it's default longterm kernel or Fedora with a longterm kernel, both currently are version 6.12
+- built on CentOS with its default longterm kernel or Fedora with a longterm kernel, both currently are version 6.12
 - installation via [existing bootc install methods](https://docs.fedoraproject.org/en-US/bootc/bare-metal/) or an Anaconda ISO rather than coreos-install with required butane/ignition
 - features will be provided as system extensions (systemd sysext) instead of via various images with tags (eg, minimal, hci and nvidia)
 
@@ -54,7 +54,7 @@ The CPP conditional logic in the Containerfile provides several benefits.
 
 *Another goal is to make installing and using Cayo better than its sibling, uCore.*
 
-- choosing which image to install should be simple, only have to choose Cayo based on Fedora or CentOS
+- choosing which image to install should be simple, only choose if based on Fedora or CentOS
 - we will ship only a single image `cayo` rather than three as in uCore (well two, based on CentOS and Fedora)
   - we will use systemd sysext to provide the features which previously required multiple images
   - we can ship *fewer packages* in the `cayo` image but have *more features* because of this approach
