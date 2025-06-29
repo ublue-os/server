@@ -11,7 +11,7 @@ This project builds a server image similar to [uCore](https://github.com/ublue-o
 Similarities to uCore:
 
 - bootc/rpm-ostree "immutable" rootfs (CoreOS itself is now built on bootc)
-- opinionated, includs many of the common tools found in uCore
+- opinionated, includes many of the common tools found in uCore
 - auto-update capabilities
 
 Differences from uCore:
