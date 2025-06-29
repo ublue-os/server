@@ -306,7 +306,7 @@ hhd-rechunk $variant="" $version="":
         {{ rechunker }} \
         /sources/rechunk/3_chunk.sh
     {{ podman }} volume rm cache_ostree
-    {{ if env("CI", "") != "" { 'mv ' + builddir / '$varaint-$version/$image_name.tar ' + justfile_dir() / '$image_name.tar' } else { '' } }}
+    {{ if env("CI", "") != "" { 'mv ' + builddir / '$variant-$version/$image_name.tar ' + justfile_dir() / '$image_name.tar' } else { '' } }}
 
 # Removes all Tags of an image from container storage.
 [group('Utility')]
