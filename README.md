@@ -2,7 +2,7 @@
 
 *This project is a work in progress!*
 
-Cayo is a Linux server system intended for container and storage workloads  using included tools like Podman and ZFS. It is suitable to for installation on bare metal or virtual machines, and Cockpit provides easy management. Extensions optionally provide features such as Docker CE, NVIDIA drivers, WiFi support, Samba and Virtual Machine hosting with libvirt. Cayo is a bootc image built on solid the solid foundations of CentOS and Fedora.
+Cayo is a Linux server system intended for container and storage workloads  using included tools like Podman and ZFS. It is suitable for installation on bare metal or virtual machines, and Cockpit provides easy management. Extensions optionally provide features such as Docker CE, NVIDIA drivers, WiFi support, Samba and Virtual Machine hosting with libvirt. Cayo is a bootc image built on the solid foundations of CentOS and Fedora.
 
 ## Quick Summary
 
