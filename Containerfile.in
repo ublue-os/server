@@ -4,7 +4,8 @@ FROM NVIDIA as akmods_nvidia
 FROM ZFS as akmods_zfs
 FROM SOURCE_IMAGE as cayo
 
-ARG IMAGE_VERSION
+ARG IMAGE_VERSION_IN
+ARG KERNEL_NAME_IN
 
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/var/log \

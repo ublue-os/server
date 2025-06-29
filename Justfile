@@ -211,13 +211,19 @@ build-container $variant="" $version="":
         "--label" "org.opencontainers.image.version=${IMAGE_VERSION}"
         "--label" "ostree.linux=${KERNEL_VERSION}"
     )
+    KERNEL_NAME="kernel"
+    if [[ "$AKMODS_ZFS_IMAGE" == *"longterm"* ]];then
+        KERNEL_NAME="kernel-longterm"
+    fi
 
     # BuildArgs
     BUILD_ARGS=(
         "--security-opt=label=disable"
         "--cap-add=all"
         "--device" "/dev/fuse"
-        "--build-arg=IMAGE_VERSION=$IMAGE_VERSION"
+        "--env" "CI=$CI"
+        "--cpp-flag=-DIMAGE_VERSION_IN=IMAGE_VERSION=$IMAGE_VERSION"
+        "--cpp-flag=-DKERNEL_NAME_IN=KERNEL_NAME=$KERNEL_NAME"
         "--cpp-flag=-DSOURCE_IMAGE=$source_image"
         "--cpp-flag=-DZFS=$AKMODS_ZFS_IMAGE"
     )
@@ -240,11 +246,10 @@ build-container $variant="" $version="":
         fi
     done
     echo "$labels" >> {{ builddir / '$variant-$version/Containerfile' }}
-    sed -i "s/^ARG IMAGE_VERSION/ARG IMAGE_VERSION=\"$IMAGE_VERSION\"/" {{ builddir / '$variant-$version/Containerfile' }}
     sed -i '/^$/d;/^#.*$/d' {{ builddir / '$variant-$version/Containerfile' }}
 
     # Build Image
-    {{ podman }} build -f Containerfile.in "${BUILD_ARGS[@]}" "${LABELS[@]}" "${TAGS[@]}" {{ justfile_dir() }}
+    {{ podman }} build -f Containerfile.in "${BUILD_ARGS[@]}" "${LABELS[@]}" "${TAGS[@]}" {{ if env('CI', '') != '' { '--env CI=$CI' } else { '' } }} {{ justfile_dir() }}
 
 # HHD-Dev Rechunk Image
 hhd-rechunk $variant="" $version="":
