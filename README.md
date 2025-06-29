@@ -31,7 +31,7 @@ The most noticeable difference for most users will be:
 
 As time goes on and Universal Blue projects have evolved, our build scripts have gotten more powerful, but also more difficult to read.
 
-*A major goal with Cayo is to create new, healthier patterns for building Universal Blue images.* We want tooling which is easy to follow, both for existing maintainers and any other interested party. Enabling local developement and testing is a high priority, and doing this right means our GitHub Actions workflows can be very simple.
+*A major goal with Cayo is to create new, healthier patterns for building Universal Blue images.* We want tooling which is easy to follow, both for existing maintainers and any other interested party. Enabling local development and testing is a high priority, and doing this right means our GitHub Actions workflows can be very simple.
 
 How we are improving our CI and Dev:
 
