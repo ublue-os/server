@@ -5,9 +5,8 @@ podman := require('podman')
 podman-remote := which('podman-remote') || podman + ' --remote'
 builddir := shell('mkdir -p $1 && echo $1', absolute_path(env('CAYO_BUILD', 'build')))
 image := "cayo"
-variant := "base"
-version := "10"
-flavor := "main"
+variant := env('CAYO_VARIANT', shell('yq ".defaults.variant" images.yaml'))
+version := env('CAYO_VERSION', shell('yq ".defaults.version" images.yaml'))
 
 # Source Images
 
@@ -18,31 +17,24 @@ qemu := shell("yq '.images.qemu.source' images.yaml")
 _default:
     @just --list --unsorted
 
-podman-info:
-    {{ podman }} info
-
 [private]
 PRIVKEY := env('HOME') / '.local/share/containers/podman/machine/machine'
 [private]
 PUBKEY := PRIVKEY + '.pub'
 [private]
 default-inputs := '
-: ${image:=' + image + '}
 : ${variant:=' + variant + '}
 : ${version:=' + version + '}
-: ${flavor:=' + flavor + '}
 '
 [private]
-get-names := '''
-just check-valid-image $image $variant $flavor $version
-
+get-names := just + ' check-valid-image $variant $version
 function image-get() {
     if [ -z "$1" ]; then
       echo "image-get: requires a key argument"
       exit 1
     fi
     KEY="${1}"
-    data=$(IFS='' yq -Mr "explode(.)|.images|.$image-$variant-$flavor-$version|.$KEY" images.yaml)
+    data=$(IFS="" yq -Mr "explode(.)|.images|.' + image + '-$variant-$version|.$KEY" images.yaml)
     echo ${data}
 }
 source_image="$(image-get source)"
@@ -53,10 +45,10 @@ image_name="$(image-get name)"
 image_version="$(image-get version)"
 image_description="$(image-get description)"
 image_cpp_flags="$(image-get cppFlags[])"
-'''
+'
 [private]
 build-missing := '
-cmd="' + just + ' build $image $variant $flavor $version"
+cmd="' + just + ' build $variant $version"
 if ! ' + podman + ' image exists "localhost/$image_name:$image_version"; then
     echo "' + style('warning') + 'Warning' + NORMAL + ': Container Does Not Exist..." >&2
     echo "' + style('warning') + 'Will Run' + NORMAL + ': ' + style('command') + '$cmd' + NORMAL + '" >&2
@@ -79,36 +71,35 @@ log_sum "\`\`\`"
 '''
 
 [group('Utility')]
-check-valid-image $image="" $variant="" $flavor="" $version="":
+check-valid-image $variant="" $version="":
     #!/usr/bin/env bash
     set -e
     {{ default-inputs }}
-    data=$(IFS='' yq -Mr "explode(.)|.images|.$image-$variant-$flavor-$version" images.yaml)
+    data=$(IFS='' yq -Mr "explode(.)|.images|.{{ image }}-$variant-$version" images.yaml)
     if [[ "null" == "$data" ]]; then
-        echo "ERROR Invalid inputs: no matching image definition found for: ${image}-${variant}-${flavor}-${version}"
+        echo "ERROR Invalid inputs: no matching image definition found for: {{ image }}-${variant}-${version}"
         exit 1
     fi
 
 [group('Utility')]
-gen-tags $image="" $variant="" $flavor="" $version="":
+gen-tags $variant="" $version="":
     #!/usr/bin/env bash
-    set -e
     {{ default-inputs }}
     {{ get-names }}
+    set ${CI:+-x} -eou pipefail
     # Generate Timestamp with incrementing version point
     TIMESTAMP="$(date +%Y%m%d)"
-    #LIST_TAGS="$(mktemp)"
-    # TODO: some work we can do here to check the version in the CentOS labels
-    #while [[ ! -s "$LIST_TAGS" ]]; do
-    #    skopeo list-tags docker://registry/$image_name > "$LIST_TAGS"
-    #done
-    #if [[ $(cat "$LIST_TAGS" | jq "any(.Tags[]; contains(\"$image_version-$TIMESTAMP\"))") == "true" ]]; then
-    #    POINT="1"
-    #    while $(cat "$LIST_TAGS" | jq -e "any(.Tags[]; contains(\"$image_version-$TIMESTAMP.$POINT\"))")
-    #    do
-    #        (( POINT++ ))
-    #    done
-    #fi
+    LIST_TAGS="$(mktemp)"
+    while [[ ! -s "$LIST_TAGS" ]]; do
+       skopeo list-tags docker://$image_registry/$image_org/$image_name > "$LIST_TAGS"
+    done
+    if [[ $(cat "$LIST_TAGS" | jq "any(.Tags[]; contains(\"$image_version-$TIMESTAMP\"))") == "true" ]]; then
+       POINT="1"
+       while $(cat "$LIST_TAGS" | jq -e "any(.Tags[]; contains(\"$image_version-$TIMESTAMP.$POINT\"))")
+       do
+           (( POINT++ ))
+       done
+    fi
 
     if [[ -n "${POINT:-}" ]]; then
         TIMESTAMP="$TIMESTAMP.$POINT"
@@ -118,7 +109,10 @@ gen-tags $image="" $variant="" $flavor="" $version="":
     SHA_SHORT="$(git rev-parse --short HEAD)"
 
     # Define Versions
-    COMMIT_TAGS=("$image_version" "$SHA_SHORT-$image_version")
+    COMMIT_TAGS=()
+    if [[ -n "{{ env('GITHUB_PR_NUMBER', '') }}" ]]; then
+        COMMIT_TAGS=("$image_version" "pr-$image_version-$SHA_SHORT" "pr-$image_version-{{ env('GITHUB_PR_NUMBER', '') }}")
+    fi
     BUILD_TAGS=("$image_version" "$image_version-$TIMESTAMP")
 
     declare -A output
@@ -154,32 +148,33 @@ fix:
 alias run := run-container
 
 [group('Container')]
-run-container $image="" $variant="" $flavor="" $version="":
+[no-exit-message]
+run-container $variant="" $version="":
     #!/usr/bin/env bash
     set -eou pipefail
     {{ default-inputs }}
     {{ get-names }}
     {{ build-missing }}
     echo "{{ style('warning') }}Running:{{ NORMAL }} {{ style('command') }}{{ just }} run -it --rm localhost/$image_name:$image_version bash -l {{ NORMAL }}"
-    {{ podman }} run -it --rm "localhost/$image_name:$image_version" bash -l || exit 0
+    {{ podman }} run -it --rm "localhost/$image_name:$image_version" bash -l
 
 # Build a Container
 
 alias build := build-container
 
 [group('Container')]
-build-container $image="" $variant="" $flavor="" $version="":
+build-container $variant="" $version="":
     #!/usr/bin/env bash
     {{ default-inputs }}
-    {{ just }} check-valid-image $image $variant $flavor $version
+    {{ just }} check-valid-image $variant $version
     {{ get-names }}
-    mkdir -p {{ builddir / '$image_name' }}
-    set -eou pipefail
+    mkdir -p {{ builddir / '$variant-$version' }}
+    set ${CI:+-x} -eou pipefail
     # Verify Source: do after upstream starts signing images
 
     # Tags
-    declare -A gen_tags="($({{ just }} gen-tags $image $variant $flavor $version))"
-    if [[ "${github:-}" =~ pull_request ]]; then
+    declare -A gen_tags="($({{ just }} gen-tags $variant $version))"
+    if [[ "{{ env('GITHUB_EVENT_NAME', '') }}" =~ pull_request ]]; then
         tags=(${gen_tags["COMMIT_TAGS"]})
     else
         tags=(${gen_tags["BUILD_TAGS"]})
@@ -189,17 +184,20 @@ build-container $image="" $variant="" $flavor="" $version="":
     for tag in "${tags[@]}"; do
         TAGS+=("--tag" "localhost/$image_name:$tag")
     done
+    AKMODS_ZFS_IMAGE=$(yq ".images.${image_name}-${variant}-${version}.zfs" images.yaml)
 
     # Pull akmods-zfs image with retry as we always need it for kernel and ZFS
-    {{ podman }} pull --retry 3 "$image_registry/$image_org/akmods-zfs:centos-stream$version"
+    {{ podman }} pull --retry 3 $AKMODS_ZFS_IMAGE
+    # Pull source and akmods images with retry
+    {{ podman }} pull --retry 3 "$source_image"
 
     # Labels
     IMAGE_VERSION="$image_version.$TIMESTAMP"
-    KERNEL_VERSION="$(podman inspect $image_registry/$image_org/akmods-zfs:centos-stream$version --format '{{{{ index .Labels "ostree.linux" }}')"
+    KERNEL_VERSION="$({{ podman }} inspect $AKMODS_ZFS_IMAGE --format '{{{{ index .Labels "ostree.linux" }}')"
     LABELS=(
         "--label" "containers.bootc=1"
         "--label" "io.artifacthub.package.deprecated=false"
-        "--label" "io.artifacthub.package.keywords=bootc,centos,cayo,ublue,universal-blue"
+        "--label" "io.artifacthub.package.keywords=bootc,cayo,centos,fedora,ublue,universal-blue"
         "--label" "io.artifacthub.package.logo-url=https://avatars.githubusercontent.com/u/120078124?s=200&v=4"
         "--label" "io.artifacthub.package.maintainers=[{\"name\": \"bsherman\", \"email\": \"benjamin@holyarmy.org\"}]"
         "--label" "io.artifacthub.package.readme-url=https://raw.githubusercontent.com/$image_registry/$image_org/$image_repo/main/README.md"
@@ -221,22 +219,11 @@ build-container $image="" $variant="" $flavor="" $version="":
         "--device" "/dev/fuse"
         "--build-arg=IMAGE_VERSION=$IMAGE_VERSION"
         "--cpp-flag=-DSOURCE_IMAGE=$source_image"
-        "--cpp-flag=-DZFS=$image_registry/$image_org/akmods-zfs:centos-stream$version"
+        "--cpp-flag=-DZFS=$AKMODS_ZFS_IMAGE"
     )
     for FLAG in $image_cpp_flags; do
-        case "${FLAG:-}" in
-        "NVIDIA")
-            BUILD_ARGS+=("--cpp-flag=-D$FLAG=$image_registry/$image_org/akmods-nvidia:centos-stream$version")
-            ;;
-        *)
-            BUILD_ARGS+=("--cpp-flag=-D$FLAG")
-            ;;
-        esac
+        BUILD_ARGS+=("--cpp-flag=-D$FLAG")
     done
-
-    # Pull source and akmods images with retry (akmods-zfs pulled above)
-    {{ podman }} pull --retry 3 "$source_image"
-    {{ if flavor == 'nvidia' { podman + ' pull --retry 3 "$image_registry/$image_org/akmods-nvidia:centos-stream$version"' } else { '' } }}
 
     # Render Containerfile
     flags=()
@@ -245,30 +232,30 @@ build-container $image="" $variant="" $flavor="" $version="":
             flags+=("${f#*flag=}")
         fi
     done
-    {{ require('cpp') }} -E -traditional Containerfile.in ${flags[@]} > {{ builddir / '$image_name/Containerfile' }}
+    {{ require('cpp') }} -E -traditional Containerfile.in ${flags[@]} > {{ builddir / '$variant-$version/Containerfile' }}
     labels="LABEL"
     for l in "${LABELS[@]}"; do
         if [[ "$l" != "--label" ]]; then
             labels+=" $(jq -R <<< "${l%%=*}")=$(jq -R <<< "${l#*=}")"
         fi
     done
-    echo "$labels" >> {{ builddir / '$image_name/Containerfile' }}
-    sed -i "s/^ARG IMAGE_VERSION/ARG IMAGE_VERSION=\"$IMAGE_VERSION\"/" {{ builddir / '$image_name/Containerfile' }}
-    sed -i '/^$/d;/^#.*$/d' {{ builddir / '$image_name/Containerfile' }}
+    echo "$labels" >> {{ builddir / '$variant-$version/Containerfile' }}
+    sed -i "s/^ARG IMAGE_VERSION/ARG IMAGE_VERSION=\"$IMAGE_VERSION\"/" {{ builddir / '$variant-$version/Containerfile' }}
+    sed -i '/^$/d;/^#.*$/d' {{ builddir / '$variant-$version/Containerfile' }}
 
     # Build Image
     {{ podman }} build -f Containerfile.in "${BUILD_ARGS[@]}" "${LABELS[@]}" "${TAGS[@]}" {{ justfile_dir() }}
 
 # HHD-Dev Rechunk Image
-hhd-rechunk $image="" $variant="" $flavor="" $version="":
+hhd-rechunk $variant="" $version="":
     #!/usr/bin/env bash
     {{ default-inputs }}
-    {{ just }} check-valid-image $image $variant $flavor $version
+    {{ just }} check-valid-image $variant $version
     {{ get-names }}
-    mkdir -p {{ builddir / "$image_name" }}
-    {{ if shell('id -u') != '0' { podman + ' unshare -- ' + just + ' hhd-rechunk $image $variant $flavor $version; exit $?' } else { '' } }}
+    mkdir -p {{ builddir / '$variant-$version' }}
+    {{ if shell('id -u') != '0' { podman + ' unshare -- ' + just + ' hhd-rechunk $variant $version; exit $?' } else { '' } }}
 
-    set -xeou pipefail
+    set ${CI:+-x} -eou pipefail
 
     # Labels
     VERSION="$({{ podman }} inspect localhost/$image_name:$version --format '{{{{ index .Config.Labels "org.opencontainers.image.version" }}')"
@@ -300,11 +287,11 @@ hhd-rechunk $image="" $variant="" $flavor="" $version="":
 
     {{ podman }} unmount "$CREF"
     {{ podman }} rm "$CREF"
-    {{ if env("CI", "") != "" { just + ' clean $image $variant $flavor $version localhost' } else { '' } }}
+    {{ if env("CI", "") != "" { just + ' clean $variant $version localhost' } else { '' } }}
 
     {{ podman }} run --rm \
         --security-opt label=disable \
-        --volume "{{ builddir / "$image_name" }}:/workspace" \
+        --volume "{{ builddir / '$variant-$version' }}:/workspace" \
         --volume "{{ justfile_dir() }}:/var/git" \
         --volume cache_ostree:/var/ostree \
         --env REPO=/var/ostree/repo \
@@ -319,11 +306,11 @@ hhd-rechunk $image="" $variant="" $flavor="" $version="":
         {{ rechunker }} \
         /sources/rechunk/3_chunk.sh
     {{ podman }} volume rm cache_ostree
-    {{ if env("CI", "") != "" { 'mv ' + builddir / '$image_name' / '$image_name.tar $image_name.tar ' } else { '' } }}
+    {{ if env("CI", "") != "" { 'mv ' + builddir / '$variant-$version/$image_name.tar ' + justfile_dir() / '$image_name.tar' } else { '' } }}
 
 # Removes all Tags of an image from container storage.
 [group('Utility')]
-clean $image $variant $flavor $version $registry="":
+clean $variant $version $registry="":
     #!/usr/bin/env bash
     set -eou pipefail
 
@@ -335,21 +322,20 @@ clean $image $variant $flavor $version $registry="":
     fi
 
 # Secureboot
-secureboot image="" variant="" flavor="" version="":
+secureboot variant="" version="":
     #!/usr/bin/bash
-    set -euo pipefail
     {{ default-inputs }}
-    {{ just }} check-valid-image $image $variant $flavor $version
+    {{ just }} check-valid-image $variant $version
     {{ get-names }}
-    mkdir -p {{ builddir / "$image_name" }}
-    cd {{ builddir / "$image_name" }}
-    set -x
-    kernel_release=$(podman inspect $image_name:$version --format '{{{{ index .Labels "ostree.linux" }}')
-    TMP=$(podman create localhost/$image_name:$version bash)
+    mkdir -p {{ builddir / '$variant-$version' }}
+    cd {{ builddir / '$variant-$version' }}
+    set ${CI:+-x} -euo pipefail
+    kernel_release=$({{ podman }} inspect $image_name:$version --format '{{{{ index .Labels "ostree.linux" }}')
+    TMP=$({{ podman }} create localhost/$image_name:$version bash)
     TMPDIR="$(mktemp -d -p .)"
     trap 'rm -rf $TMPDIR' SIGINT EXIT
-    podman cp "$TMP":/usr/lib/modules/${kernel_release}/vmlinuz $TMPDIR/vmlinuz
-    podman rm -f $TMP
+    {{ podman }} cp "$TMP":/usr/lib/modules/${kernel_release}/vmlinuz $TMPDIR/vmlinuz
+    {{ podman }} rm -f $TMP
     curl --retry 3 -Lo "$TMPDIR"/kernel-sign.der https://github.com/ublue-os/kernel-cache/raw/main/certs/public_key.der
     curl --retry 3 -Lo "$TMPDIR"/akmods.der https://github.com/ublue-os/kernel-cache/raw/main/certs/public_key_2.der
     openssl x509 -in "$TMPDIR"/kernel-sign.der -out "$TMPDIR"/kernel-sign.crt
@@ -367,17 +353,15 @@ secureboot image="" variant="" flavor="" version="":
 
 # Push Images to Registry
 [group('CI')]
-push-to-registry $image="" $variant="" $flavor="" $version="" $destination="" $transport="":
+push-to-registry $variant="" $version="" $destination="" $transport="":
     #!/usr/bin/bash
-    set -eou pipefail
-
     {{ if env('COSIGN_PRIVATE_KEY', '') != '' { 'printf "%s" "$COSIGN_PRIVATE_KEY" > /tmp/cosign.key' } else { '' } }}
     {{ if env('CI', '') != '' { logsum } else { '' } }}
 
     {{ default-inputs }}
     {{ get-names }}
 
-    set -x
+    set ${CI:+-x} -eou pipefail
 
     : "${destination:=$image_registry/$image_org}"
     : "${transport:="docker://"}"
@@ -407,7 +391,7 @@ init-machine:
         --volume "{{ env('HOME') + ":" + env('HOME') }}" 2>{{ builddir }}/error.log
     ec=$?
     if [ $ec != 0 ] && ! grep -q 'VM already exists' {{ builddir }}/error.log; then
-        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(tail -n1 {{ builddir }}/error.log | sed -E 's/Error:\s//')" >&2
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(sed -E 's/Error:\s//' {{ builddir }}/error.log)" >&2
         exit $ec
     fi
     exit 0
@@ -419,12 +403,12 @@ start-machine: init-machine
     {{ podman }} machine start 2>{{ builddir }}/error.log
     ec=$?
     if [ $ec != 0 ] && ! grep -q 'already running' {{ builddir }}/error.log; then
-        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(tail -n1 {{ builddir }}/error.log | sed -E 's/Error:\s//')" >&2
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(sed -E 's/Error:\s//' {{ builddir }}/error.log)" >&2
         exit $ec
     fi
     exit 0
 
-build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-machine
+build-disk $variant="" $version="" $registry="": start-machine
     #!/usr/bin/env bash
     {{ default-inputs }}
     : "${registry:=localhost}"
@@ -432,11 +416,11 @@ build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-mach
     fq_name="$registry/$image_name:$version"
     set -eou pipefail
     # Create Build Dir
-    mkdir -p {{ builddir }}/$image_name
+    mkdir -p {{ builddir / '$variant-$version' }}
 
     # Process Template
-    cp iso_files/disk.toml {{ builddir }}/$image_name/disk.toml
-    sed -i "s|<SSHPUBKEY>|$(cat {{ PUBKEY }})|" {{ builddir }}/$image_name/disk.toml
+    cp iso_files/disk.toml {{ builddir / '$variant-$version/disk.toml' }}
+    sed -i "s|<SSHPUBKEY>|$(cat {{ PUBKEY }})|" {{ builddir / '$variant-$version/disk.toml' }}
 
     # Load image into rootful podman-machine
     if ! {{ podman-remote }} image exists $fq_name && ! {{ podman }} image exists $fq_name; then
@@ -459,8 +443,8 @@ build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-mach
         --privileged \
         --pull=newer \
         --security-opt label=type:unconfined_t \
-        -v {{ builddir }}/$image_name/disk.toml:/config.toml:ro \
-        -v {{ builddir }}/$image_name:/output \
+        -v {{ builddir / '$variant-$version' }}/disk.toml:/config.toml:ro \
+        -v {{ builddir / '$variant-$version' }}:/output \
         -v /var/lib/containers/storage:/var/lib/containers/storage \
         quay.io/centos-bootc/bootc-image-builder:latest \
         {{ if env('CI', '') != '' { '--progress verbose' } else { '--progress auto' } }} \
@@ -469,36 +453,36 @@ build-disk $image="" $variant="" $flavor="" $version="" $registry="": start-mach
         --rootfs xfs \
         $fq_name
 
-run-disk $image="" $variant="" $flavor="" $version="" $registry="":
+run-disk $variant="" $version="" $registry="":
     #!/usr/bin/env bash
     {{ default-inputs }}
     : "${registry:=localhost}"
     {{ get-names }}
     set -ou pipefail
-    if [ ! -f {{ builddir }}/$image_name/qcow2/disk.qcow2 ]; then
-        echo "{{ style('error') }}Error:{{ NORMAL }} Disk Image \"$image_name\" not built" >&2 && exit 1
+    if [ ! -f {{ builddir / '$variant-$version/qcow2/disk.qcow2' }} ]; then
+        echo "{{ style('error') }}Error:{{ NORMAL }} Disk Image \"$image_name-$version-$variant\" not built" >&2 && exit 1
     fi
 
     {{ require('macadam') }} init \
         --ssh-identity-path {{ PRIVKEY }} \
-        --username root 2>{{ builddir }}/error.log \
-        {{ builddir }}/$image_name/qcow2/disk.qcow2
+        --username root \
+        {{ builddir / '$variant-$version/qcow2/disk.qcow2' }} 2> {{ builddir }}/error.log
     ec=$?
     if [ $ec != 0 ] && ! grep -q 'VM already exists' {{ builddir }}/error.log; then
-        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(tail -n1 {{ builddir }}/error.log | sed -E 's/Error:\s//')" >&2
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(sed -E 's/Error:\s//' {{ builddir }}/error.log)" >&2
     fi
 
-    macadam start 2>>{{ builddir }}/error.log
+    macadam start 2>{{ builddir }}/error.log
     ec=$?
     if [ $ec != 0 ] && ! grep -q 'already running' {{ builddir }}/error.log; then
-        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(tail -n1 {{ builddir }}/error.log | sed -E 's/Error:\s//')" >&2
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(sed -E 's/Error:\s//' {{ builddir }}/error.log)" >&2
         printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(tail -n1 ${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/macadam/gvproxy.log)" >&2
         exit $?
     fi
     macadam ssh -- cat /etc/os-release
     macadam ssh -- systemctl status
 
-build-iso $image="" $variant="" $flavor="" $version="" $registry="": start-machine
+build-iso $variant="" $version="" $registry="": start-machine
     #!/usr/bin/env bash
     {{ default-inputs }}
     : "${registry:=localhost}"
@@ -506,15 +490,15 @@ build-iso $image="" $variant="" $flavor="" $version="" $registry="": start-machi
     fq_name="$registry/$image_name:$version"
     set -eou pipefail
     # Create Build Dir
-    mkdir -p build/$image_name
+    mkdir -p {{ builddir / '$variant-$version' }}
 
     # Process Template
-    cp iso_files/iso.toml build/$image_name/iso.toml
-    sed -i "s|<URL>|$fq_name|" build/$image_name/iso.toml
+    cp iso_files/iso.toml {{ builddir / '$variant-$version/iso.toml' }}
+    sed -i "s|<URL>|$fq_name|" {{ builddir / '$variant-$version/iso.toml' }}
     if [[ $registry == "localhost" ]]; then
-        sed -i "s|<SIGPOLICY>||" build/$image_name/iso.toml
+        sed -i "s|<SIGPOLICY>||" {{ builddir / '$variant-$version/iso.toml' }}
     else
-        sed -i "s|<SIGPOLICY>| --enforce-container-sigpolicy|" build/$image_name/iso.toml
+        sed -i "s|<SIGPOLICY>| --enforce-container-sigpolicy|" {{ builddir / '$variant-$version/iso.toml' }}
     fi
 
     # Load image into rootful podman-machine
@@ -538,8 +522,8 @@ build-iso $image="" $variant="" $flavor="" $version="" $registry="": start-machi
         --privileged \
         --pull=newer \
         --security-opt label=type:unconfined_t \
-        -v ./build/$image_name/iso.toml:/config.toml:ro \
-        -v ./build/$image_name:/output \
+        -v {{ builddir / '$variant-$version/iso.toml' }}:/config.toml:ro \
+        -v {{ builddir / '$variant-$version' }}:/output \
         -v /var/lib/containers/storage:/var/lib/containers/storage \
         quay.io/centos-bootc/bootc-image-builder:latest \
         {{ if env('CI', '') != '' { '--progress verbose' } else { '--progress auto' } }} \
@@ -547,13 +531,13 @@ build-iso $image="" $variant="" $flavor="" $version="" $registry="": start-machi
         --use-librepo=True \
         $registry/$image_name:$version
 
-run-iso $image="" $variant="" $flavor="" $version="":
+run-iso $variant="" $version="":
     #!/usr/bin/env bash
     {{ default-inputs }}
     {{ get-names }}
-    set -xeuo pipefail
-    if [ ! -f build/$image_name/bootiso/install.iso ]; then
-        echo "{{ style('error') }}Error:{{ NORMAL }} Install ISO \"$image_name\" not built" >&2 && exit 1
+    set -euo pipefail
+    if [ ! -f {{ builddir / '$variant-$version/bootiso/install.iso' }} ]; then
+        echo "{{ style('error') }}Error:{{ NORMAL }} Install ISO \"$image_name-$variant-$version\" not built" >&2 && exit 1
     fi
     # Determine an available port to use
     port=8006
@@ -592,7 +576,7 @@ run-iso $image="" $variant="" $flavor="" $version="":
     run_args+=(--device=/dev/kvm)
     run_args+=(--device=/dev/net/tun)
     run_args+=(--cap-add NET_ADMIN)
-    run_args+=(--volume "./build/$image_name/bootiso/install.iso":"/boot.iso")
+    run_args+=(--volume "{{ builddir / '$variant-$version/bootiso/install.iso' }}":"/boot.iso")
 
     # Run the VM and open the browser to connect
     {{ podman-remote }} run "${run_args[@]}" {{ qemu }}

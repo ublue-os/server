@@ -2,7 +2,7 @@
 #shellcheck disable=SC2114,SC2174
 # */
 
-set -xeuo pipefail
+set ${CI:+-x} -euo pipefail
 
 # /*
 # Cleanup /run/build_files
