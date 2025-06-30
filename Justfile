@@ -251,6 +251,11 @@ build-container $variant="" $version="":
     # Build Image
     {{ podman }} build -f Containerfile.in "${BUILD_ARGS[@]}" "${LABELS[@]}" "${TAGS[@]}" {{ justfile_dir() }}
 
+    ## Temporary HACK
+    ## build samba extension
+    cd extensions/samba
+    just build localhost/cayo:42 x86_64
+
 # HHD-Dev Rechunk Image
 hhd-rechunk $variant="" $version="":
     #!/usr/bin/env bash
@@ -585,3 +590,9 @@ run-iso $variant="" $version="":
 
     # Run the VM and open the browser to connect
     {{ podman-remote }} run "${run_args[@]}" {{ qemu }}
+
+ext-targets:
+    #!/usr/bin/env bash
+    set -eou pipefail
+    cd extensions/samba
+    just targets

@@ -688,6 +688,7 @@ reset-selinux-labels target arch=arch:
 
     filecontexts="/etc/selinux/targeted/contexts/files/file_contexts"
     echo "🏷️ Resetting SELinux labels"
+    podman image scp {{target}} root@localhost::
     sudo podman run -ti {{podman_opts}} \
         --volume "${PWD}:/var/srv" \
         --volume "${PWD}/../.dnf-cache:/var/cache/libdnf5" \
