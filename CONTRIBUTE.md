@@ -110,7 +110,7 @@ just run-container
 If your target container does not already exist in the image store, it will autobuild first.
 
 #### VM Testing
-Other times, we need an actual running system in order to make sure the Image is working correctly. For this we use [Bootc Image Builder](https://osbuild.org/docs/bootc/) which can build a `qcow2`, `raw`, `iso`, and other formats. Since we are developing inside of Devcontainer (and using the recommended `podman` container engine), we do not have acces to they systems real root. Building a Container disk-image, requires the ability to create filesystems, partition disks, and other "real" root required tasks. To accomplish this, we use a `podman machine`. Podman has the ability to manage a well integrated `qemu` instance that `podman` can interact with `podman-remote` and `podman --remote`.
+Other times, we need an actual running system in order to make sure the Image is working correctly. For this we use [Bootc Image Builder](https://osbuild.org/docs/bootc/) which can build a `qcow2`, `raw`, `iso`, and other formats. Since we are developing inside of Devcontainer (and using the recommended `podman` container engine), we do not have access to the system's real root. Building a Container disk-image requires the ability to create filesystems, partition disks, and other "real" root required tasks. To accomplish this, we use a `podman machine`. Podman has the ability to manage a well-integrated `qemu` instance that `podman` can interact with `podman-remote` and `podman --remote`.
 
 In our case, we use Bootc Image Builder to build a `qcow2` disk-image, that we can then boot using [macadam](https://github.com/crc-org/macadam/). To build a disk-image, first make sure you have built a container image.
 ```bash
