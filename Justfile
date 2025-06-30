@@ -256,6 +256,7 @@ build-container $variant="" $version="":
     cd extensions/samba
     just build localhost/cayo:42 x86_64
 
+# build the container with extensions included
 build-extension-container $variant="" $version="":
     #!/usr/bin/env bash
     {{ default-inputs }}
