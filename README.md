@@ -55,23 +55,24 @@ The CPP conditional logic in the Containerfile provides several benefits.
 *Another goal is to make installing and using Cayo better than its sibling, uCore.*
 
 - choosing which image to install should be simple, only choose if based on Fedora or CentOS
-- we will ship only a single image `cayo` rather than three as in uCore (well two, based on CentOS and Fedora)
-  - we will use systemd sysext to provide the features which previously required multiple images
+- Ship only a single image `cayo` rather than three as in uCore (well two, based on CentOS and Fedora)
+  - Use systemd sysext to provide the features which previously required multiple images
   - we can ship *fewer packages* in the `cayo` image but have *more features* because of this approach
   - an example of more features: we'll ship both nvidia-proprietary (support Maxwell/Pascal but not the latest GPUs) plus nvidia-open (support Turing and later GPUs) rather than a single nvidia driver variant in uCore, but enabling this will be less hassle than switching to a completely different image
-  - an example of fewer packages: wifi support (firmwares and other packages) are moving to an extension so that's not wasted space on any machine without wifi
-- we will ship an ISO installer
-  - a common request for uCore was a way to install other than the official CoreOS methods, we can do this with Cayo as we are not tied to the CoreOS paradigms
-  - bootc-image-builder provides easy access to this
-- we will ship qcow2 images, etc
+  - Example of fewer packages: wifi support (firmwares and other packages) are moving to an extension so that's not wasted space on any machine without wifi
+- Ship an ISO installer
+  - A common request for uCore was a way to install other than the official CoreOS methods, we can do this with Cayo as we are not tied to the CoreOS paradigms
+  - `bootc-image-builder` provides easy access to this
+- Ship qcow2 images, etc
   - previously we did not have a way to build native uCore VM disk images, bootc-image-builder provides this capability for bootc images like Cayo
 - ZFS is included by default
   - yes, this change was recently made in uCore as well, but ZFS is a powerful tool core to the Cayo experience
-- system configuration tools will be included
+- System configuration tools will be included
   - ignition is powerful, but not every wants it, so it's not required
   - ignition MAY still be used, though!
   - we also plan to include cloud-init as alternative (pending testing and validation)
-- longterm release kernels (both on CentOS and Fedora) provide  confidence that updates will not render a system unusable due to  kernel regression
+- Long term release kernels (both on CentOS and Fedora) provide  confidence that updates will not render a system unusable due to  kernel regression
+- Encourage reuse of quadlets via contributions to podman's [quadlet app store](https://github.com/containers/appstore). This is distribution agnostic and will allow Universal Blue to contribute to Podman's long term health and success. 
 
 ## About the Name
 
