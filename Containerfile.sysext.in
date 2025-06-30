@@ -1,0 +1,21 @@
+FROM SOURCE_IMAGE as cayo
+
+ARG IMAGE_VERSION_ARG
+ARG KERNEL_NAME_ARG
+#ifdef CI_SETX
+ARG CI=1
+#endif /* CI_SETX */
+
+
+
+COPY extensions/samba/samba-2-4.22.2-1.fc42-42-x86-64.raw /run/extensions/samba/
+COPY extensions/samba/digest /run/extensions/samba/
+COPY extensions/samba/inputs /run/extensions/samba/
+
+RUN mkdir -p /usr/share/cayo/extensions/samba/
+RUN cp -a /run/extensions/samba/samba-2-4.22.2-1.fc42-42-x86-64.raw /usr/share/cayo/extensions/samba/
+RUN cp -a /run/extensions/samba/digest /usr/share/cayo/extensions/samba/
+RUN cp -a /run/extensions/samba/inputs /usr/share/cayo/extensions/samba/
+
+RUN chmod -R 755 /usr/share/cayo/extensions/samba/
+RUN rm -rf /run/extensions/samba/

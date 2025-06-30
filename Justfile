@@ -256,6 +256,96 @@ build-container $variant="" $version="":
     cd extensions/samba
     just build localhost/cayo:42 x86_64
 
+build-extension-container $variant="" $version="":
+    #!/usr/bin/env bash
+    {{ default-inputs }}
+    {{ just }} check-valid-image $variant $version
+    {{ get-names }}
+    mkdir -p {{ builddir / '$variant-$version' }}
+    set ${CI:+-x} -eou pipefail
+    # Verify Source: do after upstream starts signing images
+
+    # Tags
+    declare -A gen_tags="($({{ just }} gen-tags $variant $version))"
+    if [[ "{{ env('GITHUB_EVENT_NAME', '') }}" =~ pull_request ]]; then
+        tags=(${gen_tags["COMMIT_TAGS"]})
+    else
+        tags=(${gen_tags["BUILD_TAGS"]})
+    fi
+    TIMESTAMP="${gen_tags["TIMESTAMP"]}"
+    TAGS=()
+    for tag in "${tags[@]}"; do
+        TAGS+=("--tag" "localhost/$image_name:$tag")
+    done
+    AKMODS_ZFS_IMAGE=$(yq ".images.${image_name}-${variant}-${version}.zfs" images.yaml)
+
+    # Pull akmods-zfs image with retry as we always need it for kernel and ZFS
+    {{ podman }} pull --retry 3 $AKMODS_ZFS_IMAGE
+    # Pull source and akmods images with retry
+    {{ podman }} pull --retry 3 "$source_image"
+
+    # Labels
+    IMAGE_VERSION="$image_version.$TIMESTAMP"
+    KERNEL_VERSION="$({{ podman }} inspect $AKMODS_ZFS_IMAGE --format '{{{{ index .Labels "ostree.linux" }}')"
+    LABELS=(
+        "--label" "containers.bootc=1"
+        "--label" "io.artifacthub.package.deprecated=false"
+        "--label" "io.artifacthub.package.keywords=bootc,cayo,centos,fedora,ublue,universal-blue"
+        "--label" "io.artifacthub.package.logo-url=https://avatars.githubusercontent.com/u/120078124?s=200&v=4"
+        "--label" "io.artifacthub.package.maintainers=[{\"name\": \"bsherman\", \"email\": \"benjamin@holyarmy.org\"}]"
+        "--label" "io.artifacthub.package.readme-url=https://raw.githubusercontent.com/$image_registry/$image_org/$image_repo/main/README.md"
+        "--label" "org.opencontainers.image.created=$(date -u +%Y\-%m\-%d\T%H\:%M\:%S\Z)"
+        "--label" "org.opencontainers.image.description=$image_description"
+        "--label" "org.opencontainers.image.license=Apache-2.0"
+        "--label" "org.opencontainers.image.source=https://raw.githubusercontent.com/ublue-os/cayo/refs/heads/main/Containerfile.in"
+        "--label" "org.opencontainers.image.title=$image_name"
+        "--label" "org.opencontainers.image.url=https://github.com/$image_org/$image_repo"
+        "--label" "org.opencontainers.image.vendor=$image_org"
+        "--label" "org.opencontainers.image.version=${IMAGE_VERSION}"
+        "--label" "ostree.linux=${KERNEL_VERSION}"
+    )
+    KERNEL_NAME="kernel"
+    if [[ "$AKMODS_ZFS_IMAGE" =~ longterm ]];then
+        KERNEL_NAME="kernel-longterm"
+    fi
+
+    # BuildArgs
+    BUILD_ARGS=(
+        "--security-opt=label=disable"
+        "--cap-add=all"
+        "--device" "/dev/fuse"
+        "--cpp-flag=-DIMAGE_VERSION_ARG=IMAGE_VERSION=$IMAGE_VERSION"
+        "--cpp-flag=-DKERNEL_NAME_ARG=KERNEL_NAME=$KERNEL_NAME"
+        "--cpp-flag=-DSOURCE_IMAGE=$source_image"
+        "--cpp-flag=-DZFS=$AKMODS_ZFS_IMAGE"
+    )
+    for FLAG in $image_cpp_flags; do
+        BUILD_ARGS+=("--cpp-flag=-D$FLAG")
+    done
+    {{ if env('CI', '') != '' { 'BUILD_ARGS+=("--cpp-flag=-DCI_SETX")' } else { '' } }}
+
+    # Render Containerfile
+    flags=()
+    for f in "${BUILD_ARGS[@]}"; do
+        if [[ "$f" =~ cpp-flag ]]; then
+            flags+=("${f#*flag=}")
+        fi
+    done
+    {{ require('cpp') }} -E -traditional Containerfile.sysext.in ${flags[@]} > {{ builddir / '$variant-$version/Containerfile.sysext' }}
+    labels="LABEL"
+    for l in "${LABELS[@]}"; do
+        if [[ "$l" != "--label" ]]; then
+            labels+=" $(jq -R <<< "${l%%=*}")=$(jq -R <<< "${l#*=}")"
+        fi
+    done
+    echo "$labels" >> {{ builddir / '$variant-$version/Containerfile.sysext' }}
+    sed -i '/^$/d;/^#.*$/d' {{ builddir / '$variant-$version/Containerfile.sysext' }}
+
+    # Build Image
+    {{ podman }} build -f Containerfile.sysext.in "${BUILD_ARGS[@]}" "${LABELS[@]}" "${TAGS[@]}" {{ justfile_dir() }}
+
+
+
 # HHD-Dev Rechunk Image
 hhd-rechunk $variant="" $version="":
     #!/usr/bin/env bash
