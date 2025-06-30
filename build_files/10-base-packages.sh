@@ -40,11 +40,9 @@ dnf -y install --setopt=install_weak_deps=False \
     xdg-user-dirs
 
 
-# /* Currently missing dependencies
-# dnf -y copr enable ublue-os/staging
-# dnf -y install sanoid
-# dnf -y copr disable ublue-os/staging
-# */
+dnf -y copr enable ublue-os/staging
+dnf -y install snapraid
+dnf -y copr disable ublue-os/staging
 
 # /*
 ### install packages direct from github

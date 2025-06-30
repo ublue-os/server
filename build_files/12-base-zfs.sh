@@ -6,10 +6,9 @@ set ${CI:+-x} -euo pipefail
 KERNEL_VRA="$(rpm -q "$KERNEL_NAME" --queryformat '%{EVR}.%{ARCH}')"
 
 # /*
-### install base server ZFS packages and sanoid dependencies
+### install ZFS packages
 # */
 dnf -y install \
-    pv \
     /tmp/akmods-zfs-rpms/kmods/zfs/kmod-zfs-"${KERNEL_VRA}"-*.rpm \
     /tmp/akmods-zfs-rpms/kmods/zfs/libnvpair3-*.rpm \
     /tmp/akmods-zfs-rpms/kmods/zfs/libuutil3-*.rpm \
@@ -22,3 +21,13 @@ dnf -y install \
 # depmod ran automatically with zfs 2.1 but not with 2.2
 # */
 depmod -a "${KERNEL_VRA}"
+
+# /*
+### install ZFS related packages
+# */
+dnf -y copr enable ublue-os/staging
+dnf -y install \
+    mbuffer \
+    pv \
+    sanoid
+dnf -y copr disable ublue-os/staging
