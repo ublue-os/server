@@ -60,7 +60,7 @@ sudo podman run \
 --pid=host \
 -v /dev:/dev \
 -v /var/lib/containers:/var/lib/containers \
--v ~/.ssh:/temp
+-v ~/.ssh:/temp \
 --security-opt label=type:unconfined_t \
 ghcr.io/ublue-os/cayo:10 \
 bootc install to-disk /dev/sda --root-ssh-authorized-keys /temp/authorized_keys
@@ -76,7 +76,7 @@ sudo podman run \
 --pid=host \
 -v /dev:/dev \
 -v /var/lib/containers:/var/lib/containers \
--v ~/.ssh:/temp
+-v ~/.ssh:/temp \
 --security-opt label=type:unconfined_t \
 ghcr.io/ublue-os/cayo:42 \
 bootc install to-disk /dev/sda --root-ssh-authorized-keys /temp/authorized_keys --filesystem xfs
