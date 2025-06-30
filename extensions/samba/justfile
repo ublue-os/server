@@ -1,0 +1,15 @@
+name := "samba"
+packages := "
+samba
+samba-client
+"
+version_package := "samba"
+base_images := "
+quay.io/centos-bootc/centos-bootc:c10s x86_64
+ghcr.io/ublue-os/cayo:42 x86_64
+
+"
+
+import '../../sysext.just'
+
+all: default

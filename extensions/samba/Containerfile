@@ -1,0 +1,9 @@
+FROM baseimage
+
+RUN <<EORUN
+set -xeuo pipefail
+dnf install -y \
+    samba \
+    samba-usershares
+dnf clean all
+EORUN
