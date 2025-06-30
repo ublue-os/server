@@ -8,7 +8,7 @@ centos-10: &centos-10
 fedora-42: &fedora-42
   # TODO: Implement a Renovate Regex
   source: quay.io/fedora/fedora-bootc:42
-  zfs: ghcr.io/ublue-os/akmods-zfs:coreos-stable-42
+  zfs: ghcr.io/ublue-os/akmods-zfs:longterm-6.12-42
   version: 42
   cppFlags: ["FEDORA"]
 cayo-base: &cayo-base

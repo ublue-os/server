@@ -3,7 +3,7 @@ set ${CI:+-x} -euo pipefail
 # /*
 # Ensure Initramfs is generated
 # */
-KERNEL_VERSION="$(rpm -q --queryformat="%{EVR}.%{ARCH}" kernel-core)"
+KERNEL_VERSION="$(rpm -q --queryformat="%{EVR}.%{ARCH}" "$KERNEL_NAME"-core)"
 
 export DRACUT_NO_XATTR=1
 /usr/bin/dracut --no-hostonly --kver "$KERNEL_VERSION" --reproducible --zstd -v --add ostree -f "/lib/modules/$KERNEL_VERSION/initramfs.img"
@@ -13,7 +13,7 @@ chmod 0600 /lib/modules/"$KERNEL_VERSION"/initramfs.img
 # /*
 # Ensure only one kernel/initramfs is present
 # */
-KERNEL_VERSION="$(rpm -q kernel-core --queryformat '%{EVR}.%{ARCH}')"
+KERNEL_VERSION="$(rpm -q "$KERNEL_NAME"-core --queryformat '%{EVR}.%{ARCH}')"
 
 kernel_dirs=("$(ls -1 /usr/lib/modules)")
 if [[ ${#kernel_dirs[@]} -gt 1 ]]; then

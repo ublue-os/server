@@ -211,19 +211,25 @@ build-container $variant="" $version="":
         "--label" "org.opencontainers.image.version=${IMAGE_VERSION}"
         "--label" "ostree.linux=${KERNEL_VERSION}"
     )
+    KERNEL_NAME="kernel"
+    if [[ "$AKMODS_ZFS_IMAGE" =~ longterm ]];then
+        KERNEL_NAME="kernel-longterm"
+    fi
 
     # BuildArgs
     BUILD_ARGS=(
         "--security-opt=label=disable"
         "--cap-add=all"
         "--device" "/dev/fuse"
-        "--build-arg=IMAGE_VERSION=$IMAGE_VERSION"
+        "--cpp-flag=-DIMAGE_VERSION_ARG=IMAGE_VERSION=$IMAGE_VERSION"
+        "--cpp-flag=-DKERNEL_NAME_ARG=KERNEL_NAME=$KERNEL_NAME"
         "--cpp-flag=-DSOURCE_IMAGE=$source_image"
         "--cpp-flag=-DZFS=$AKMODS_ZFS_IMAGE"
     )
     for FLAG in $image_cpp_flags; do
         BUILD_ARGS+=("--cpp-flag=-D$FLAG")
     done
+    {{ if env('CI', '') != '' { 'BUILD_ARGS+=("--cpp-flag=-DCI_SETX")' } else { '' } }}
 
     # Render Containerfile
     flags=()
@@ -240,7 +246,6 @@ build-container $variant="" $version="":
         fi
     done
     echo "$labels" >> {{ builddir / '$variant-$version/Containerfile' }}
-    sed -i "s/^ARG IMAGE_VERSION/ARG IMAGE_VERSION=\"$IMAGE_VERSION\"/" {{ builddir / '$variant-$version/Containerfile' }}
     sed -i '/^$/d;/^#.*$/d' {{ builddir / '$variant-$version/Containerfile' }}
 
     # Build Image
