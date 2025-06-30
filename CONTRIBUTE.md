@@ -14,7 +14,7 @@ Where can feedback be provided?
 - [Discourse forums, look for the Cayo/uCore category](https://universal-blue.discourse.group/)
 - [Discord chat, join the #cayo-server channel (select Cayo/uCore Server users)](https://discord.gg/WEu6BdFEtp)
 
-**Help others.** Yep, it is incredbily helpful when users of a project answer questions posed by other users. This can be done in same locations above.
+**Help others.** Yep, it is incredibly helpful when users of a project answer questions posed by other users. This can be done in same locations above.
 
 Beyond the above we also welcome contributions to this GitHub repository. This can generally be:
 
