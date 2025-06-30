@@ -23,7 +23,6 @@ dnf -y install --setopt=install_weak_deps=False \
     cockpit-selinux \
     cockpit-storaged \
     cockpit-system \
-    distrobox \
     duperemove \
     firewalld \
     hdparm \
