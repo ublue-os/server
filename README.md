@@ -71,7 +71,7 @@ The CPP conditional logic in the Containerfile provides several benefits.
   - ignition is powerful, but not every wants it, so it's not required
   - ignition MAY still be used, though!
   - we also plan to include cloud-init as alternative (pending testing and validation)
-- Long term release kernels (both on CentOS and Fedora) provide  confidence that updates will not render a system unusable due to  kernel regression
+- Long term release kernels (both on CentOS and Fedora) provide confidence that updates will not render a system unusable due to kernel regression
 - Encourage reuse of quadlets via contributions to podman's [quadlet app store](https://github.com/containers/appstore). This is distribution agnostic and will allow Universal Blue to contribute to Podman's long term health and success. 
 
 ## About the Name
