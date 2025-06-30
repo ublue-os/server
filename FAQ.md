@@ -1,5 +1,5 @@
 # Cayo FAQ
-Notes from a newcomer for other newcomers
+
 
 ## Table of Contents
 1. [Cayo Images](###Images)
@@ -8,40 +8,52 @@ Notes from a newcomer for other newcomers
 4. [Common Issues](###Common%20Issues)
 
 ### Images
-We currently have 2 images for Cayo, one is based off of Centos 10 Stream and one based off of Fedora 42.  The reason for this is that one issue encountered on older hardware (my own being a box running an AMD FX-8320 + 32GB RAM), is that CentOS requires a CPU that meets [x86-64-v3 requirements](https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels).  At this point in time, Fedora 42 does not have this limitation.
+Cayo currently offers two primary images: one based on CentOS Stream 10 and another on Fedora 42. The rationale for providing both images addresses hardware compatibility.  
+
+Specifically, the CentOS-based image necessitates a CPU that meets [x86-64-v3 requirements](https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels).  At this point in time, Fedora 42 does not have this hardware limitation.
 - https://ghcr.io/ublue-os/cayo:10 (CentOS)
 - https://ghcr.io/ublue-os/cayo:42 (Fedora)
 
 ## Installation
-There are multiple ways to install Cayo on your system.  Here are a couple based off the official [bootc install methods](https://docs.fedoraproject.org/en-US/bootc/bare-metal/) page.  __This section is a work in progress.__
+Multiple methods are available for installing Cayo.  
 
-### Anaconda [WIP]
-There is work in progress on an Anaconda based ISO installer.  Please check back later when it is ready for end user consumption.
+The following sections describe installation procedures based on the official [bootc install methods](https://docs.fedoraproject.org/en-US/bootc/bare-metal/) documentation.  
+__NOTE:__ _This section is a work in progress_.
+
+### Anaconda [Work In Progress]
+An Anaconda based ISO installer is currently under development.  Please check back for updates regarding its release for testing and general availability.
 
 ### Podman
-One of the simplest ways (for now) is to boot from a [Fedora CoreOS Live DVD ISO](https://fedoraproject.org/coreos/download?stream=stable).
+One of the most straightforward installation methods currently available (at the time of this writing) involves booting from a [Fedora CoreOS Live DVD ISO](https://fedoraproject.org/coreos/download?stream=stable).
 
 #### Minimum Memory Requirements for Podman Based Install
-Due to everything running from a ramdisk, it's easy for it to fill up during download and extraction of packages.  Here are my findings for installing the Cayo images via Podman:
+Due to the installation process running from within a RAM disk, it's crucial that the target machine has adequate RAM to avoid "out of space" errors.  
+
+The following minimum RAM allocations are recommended for successful installations of Cayo images via Podman:
 - Cayo:10 (CentOS base) - 8GB RAM minimum
 - Cayo:42 (Fedora base) - 12GB RAM minimum
 
-You can scale the RAM back afterward if you wish, it only needs the extra RAM for the package files that are downloaded and extracted during installation.
+The allocated RAM can be scaled back after the installation is complete, as the additional RAM is only required for temporary package files that are downloaded and extracted during the installation phase.
 
-An authorized key file will be needed for the root user to allow login over SSH after installation.  I did the following from a virtual machine booted from the Fedora CoreOS Live DVD (where id_rsa.pub is my public SSH key for the client I will be logging into the new install from):
+An authorized key file is required for the `root` user to enable SSH access after installation.  
+
+The following steps illustrate how the author achieved this on a virtual machine booted from the Fedora CoreOS Live DVD.
+
+Assuming `id_rsa.pub` is the public SSH key for the client connecting to the new installation:
 ```
 mkdir .ssh
 curl http://[lab_webserver]:[port_number]/id_rsa.pub > .ssh/authorized_keys
 ```
 
-The id_rsa.pub file was served up from a directory using a basic python http server on my PC.
+The id_rsa.pub file was served up from a directory using a basic python http server on the author's PC.
 ```
 cd /path/where/file/is
 python -m http.server [port_number]
 ```
 
+
 #### Cayo:10 (CentOS) Install:
-Assumptions made:  My hard drive is /dev/sda and the authorized_keys file is created in the step above.
+The following command assumes the target hard drive is `/dev/sda` and the `authorized_keys` file has been created as described above.
 ```
 sudo podman run \
 --rm --privileged \
@@ -55,7 +67,9 @@ bootc install to-disk /dev/sda --root-ssh-authorized-keys /temp/authorized_keys
 ```
 
 #### Cayo:42 (Fedora) Install:
-Assumptions made:  My hard drive is /dev/sda and the authorized_keys file is created in the step above.  __NOTE:  Fedora does not provide a default root filesystem type, so we must specify this manually as a bootc argument at install.__
+The following command assumes the target hard drive is `/dev/sda` and the `authorized_keys` file has been created as described above.  
+
+__NOTE:__  Fedora-based installations require explicit specification of the root filesystem type, using the `bootc` argument `--filesystem` at install.
 ```
 sudo podman run \
 --rm --privileged \
@@ -70,12 +84,13 @@ bootc install to-disk /dev/sda --root-ssh-authorized-keys /temp/authorized_keys 
 
 ## Common Issues
 - __Podman install errors out with "out of space" issues.__  
-Check that you've assigned enough RAM for the ramdisk, 8GB for Cayo:10, 12GB for Cayo:42
-- __Cannot log in after installation.__  
-Was the argument for --root-ssh-authorized-keys provided to the bootc command?
-- __Install fails, unable to find --root-ssh-authorized-keys file.__
-The path you provide to bootc is the path inside the container, not on the host ramdisk environment.  In the examples above, this was `/temp` which was mapped from `~/.ssh` in the ramdisk environment.
+Verify that sufficient RAM has been allocated for the RAM disk.  The minimum recommended values are 8GB for Cayo:10 and 12GB for Cayo:42.  
+
+- __Unable to log in after installation.__  
+Confirm that the `--root-ssh-authorized-keys` argument was provided to the `bootc` command during installation.  
+
+- __Installation fails, unable to find `--root-ssh-authorized-keys` file.__  
+The path provided to bootc refers to the path within _the container_, not the host RAM disk environment.  In the examples provided `/temp` inside the container was mapped from `~/.ssh` inside the RAM disk environment.
 
 ## Disclaimer
-All information is provided as is from my own trial and error in my HomeLab as someone new to the project - the goal is to help other newcomers get up and running quickly and easily.  
-Running HTTP servers locally without SSL is a security risk and should not be done in a production environment.
+All information is provided "as is" and is based on observations and experiences of the author. The objective is to assist new users in deploying Cayo for the first time.  Running HTTP servers without SSL poses a security risk and is not recommended in production environments.
