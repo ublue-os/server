@@ -4,7 +4,7 @@ FROM SOURCE_IMAGE as cayo
 ARG IMAGE_VERSION_ARG
 ARG KERNEL_NAME_ARG
 #ifdef CI_SETX
-ENV CI=1
+ARG CI=1
 #endif /* CI_SETX */
 
 RUN --mount=type=cache,dst=/var/cache \
