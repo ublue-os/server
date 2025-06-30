@@ -34,7 +34,7 @@ Here are links which can help learn to write better docs:
 - https://kubernetes.io/docs/contribute/style/style-guide/
 
 Also, we use [Conventional Commits](https://www.conventionalcommits.org/) even for documentation.
-The most relevant thing here for docs contributors, please start your commit message somthing like:
+The most relevant thing here for docs contributors, please start your commit message something like:
 
 ```
 docs: corrected typo on foo FAQ entry
