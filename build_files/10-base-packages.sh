@@ -15,8 +15,8 @@ rm -fr /usr/etc
 dnf -y copr disable ublue-os/packages
 
 # /*
-### server base packages which are mostly what we added in ucore-minimal
-### systemd-container is needed for systemd-pull to download extensions
+# server base packages which are mostly what we added in ucore-minimal
+# systemd-container is needed for systemd-pull to download extensions
 # */
 dnf -y install --setopt=install_weak_deps=False \
     cockpit-networkmanager \
