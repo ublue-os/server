@@ -16,6 +16,7 @@ dnf -y copr disable ublue-os/packages
 
 # /*
 ### server base packages which are mostly what we added in ucore-minimal
+### systemd-container is needed for systemd-pull to download extensions
 # */
 dnf -y install --setopt=install_weak_deps=False \
     cockpit-networkmanager \
@@ -33,12 +34,12 @@ dnf -y install --setopt=install_weak_deps=False \
     pcp-zeroconf \
     qemu-guest-agent \
     snapraid \
+    systemd-container \
     tmux \
     usbutils \
     wireguard-tools \
     xdg-dbus-proxy \
     xdg-user-dirs
-
 
 # /* Currently missing dependencies
 # dnf -y copr enable ublue-os/staging
@@ -54,7 +55,7 @@ dnf -y install --setopt=install_weak_deps=False \
 # /*
 # Cockpit Web Service unit
 # */
-cat > /usr/lib/systemd/system/cockpit.service<<'EOF'
+cat >/usr/lib/systemd/system/cockpit.service <<'EOF'
 [Unit]
 Description=Cockpit Container
 After=network-online.target
