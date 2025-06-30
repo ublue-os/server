@@ -10,13 +10,13 @@ Next, **please provide feedback!** We want to hear about any issues you experien
 
 Where can feedback be provided?
 
-- [Github issues](https://github.com/ublue-os/cayo/issues)
+- [GitHub issues](https://github.com/ublue-os/cayo/issues)
 - [Discourse forums, look for the Cayo/uCore category](https://universal-blue.discourse.group/)
 - [Discord chat, join the #cayo-server channel (select Cayo/uCore Server users)](https://discord.gg/WEu6BdFEtp)
 
 **Help others.** Yep, it is incredbily helpful when users of a project answer questions posed by other users. This can be done in same locations above.
 
-Beyond the above we also welcome contributions to this Github repository. This can generally be:
+Beyond the above we also welcome contributions to this GitHub repository. This can generally be:
 
 - adding or editing documentation
 - code development
@@ -40,14 +40,14 @@ The most relevant thing here for docs contributors, please start your commit mes
 docs: corrected typo on foo FAQ entry
 ```
 
-Before making significant changes to something which already exists, please discuss first, either in a Github issue,
+Before making significant changes to something which already exists, please discuss first, either in a GitHub issue,
 (create one if it's a new idea/question) or chat with the team in Discord.
 
 ## Code Development
 
 The same documentation and Conventional Commits links from above apply to code contributors. 
 
-Definitely discuss any potential significant changes with the team, either in Github or Discord, before starting. Better communication up front leads to better interactions and a more welcome response to contributed code.
+Definitely discuss any potential significant changes with the team, either in GitHub or Discord, before starting. Better communication up front leads to better interactions and a more welcome response to contributed code.
 
 For example, don't simply create a PR with a bugfix, first check if a bug already has an issue filed, create an issue if it does not. Offer to fix in the initial description or comments as other contributors reply. This helps avoid duplicated efforts and rejected pull requests.
 
