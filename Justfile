@@ -42,14 +42,20 @@ image_org="$(image-get org)"
 image_registry="$(image-get registry)"
 image_repo="$(image-get repo)"
 image_name="$(image-get name)"
+image_upstream="$(image-get upstream)"
 image_version="$(image-get version)"
 image_description="$(image-get description)"
 image_cpp_flags="$(image-get cppFlags[])"
+image_is_default="$(image-get default)"
+if [ "true" != "${image_is_default}" ]; then
+    image_is_default=false
+fi
+image_tag="$image_upstream$image_version"
 '
 [private]
 build-missing := '
 cmd="' + just + ' build $variant $version"
-if ! ' + podman + ' image exists "localhost/$image_name:$image_version"; then
+if ! ' + podman + ' image exists "localhost/$image_name:$image_tag"; then
     echo "' + style('warning') + 'Warning' + NORMAL + ': Container Does Not Exist..." >&2
     echo "' + style('warning') + 'Will Run' + NORMAL + ': ' + style('command') + '$cmd' + NORMAL + '" >&2
     seconds=5
@@ -69,6 +75,10 @@ log_sum() { echo "$1" >> ${GITHUB_STEP_SUMMARY:-/dev/stdout}; }
 log_sum "# Push to GHCR result"
 log_sum "\`\`\`"
 '''
+
+[group('Utility')]
+explode-yaml:
+    yq -r "explode(.)|.images" images.yaml
 
 [group('Utility')]
 check-valid-image $variant="" $version="":
@@ -93,9 +103,9 @@ gen-tags $variant="" $version="":
     while [[ ! -s "$LIST_TAGS" ]]; do
        skopeo list-tags docker://$image_registry/$image_org/$image_name > "$LIST_TAGS"
     done
-    if [[ $(cat "$LIST_TAGS" | jq "any(.Tags[]; contains(\"$image_version-$TIMESTAMP\"))") == "true" ]]; then
+    if [[ $(cat "$LIST_TAGS" | jq "any(.Tags[]; contains(\"$image_tag-$TIMESTAMP\"))") == "true" ]]; then
        POINT="1"
-       while $(cat "$LIST_TAGS" | jq -e "any(.Tags[]; contains(\"$image_version-$TIMESTAMP.$POINT\"))")
+       while $(cat "$LIST_TAGS" | jq -e "any(.Tags[]; contains(\"$image_tag-$TIMESTAMP.$POINT\"))")
        do
            (( POINT++ ))
        done
@@ -111,9 +121,13 @@ gen-tags $variant="" $version="":
     # Define Versions
     COMMIT_TAGS=()
     if [[ -n "{{ env('GITHUB_PR_NUMBER', '') }}" ]]; then
-        COMMIT_TAGS=("$image_version" "pr-$image_version-$SHA_SHORT" "pr-$image_version-{{ env('GITHUB_PR_NUMBER', '') }}")
+        COMMIT_TAGS=("$image_tag" "pr-$image_tag-$SHA_SHORT" "pr-$image_tag-{{ env('GITHUB_PR_NUMBER', '') }}")
     fi
-    BUILD_TAGS=("$image_version" "$image_version-$TIMESTAMP")
+    if [ "true" == "$image_is_default" ]; then
+        BUILD_TAGS=("$image_upstream $image_tag" "$image_tag-$TIMESTAMP")
+    else
+        BUILD_TAGS=("$image_tag" "$image_tag-$TIMESTAMP")
+    fi
 
     declare -A output
     output["BUILD_TAGS"]="${BUILD_TAGS[*]}"
@@ -155,8 +169,8 @@ run-container $variant="" $version="":
     {{ default-inputs }}
     {{ get-names }}
     {{ build-missing }}
-    echo "{{ style('warning') }}Running:{{ NORMAL }} {{ style('command') }}{{ just }} run -it --rm localhost/$image_name:$image_version bash -l {{ NORMAL }}"
-    {{ podman }} run -it --rm "localhost/$image_name:$image_version" bash -l
+    echo "{{ style('warning') }}Running:{{ NORMAL }} {{ style('command') }}{{ just }} run -it --rm localhost/$image_name:$image_tag bash -l {{ NORMAL }}"
+    {{ podman }} run -it --rm "localhost/$image_name:$image_tag" bash -l
 
 # Build a Container
 
@@ -238,7 +252,7 @@ build-container $variant="" $version="":
             flags+=("${f#*flag=}")
         fi
     done
-    {{ require('cpp') }} -E -traditional Containerfile.in ${flags[@]} > {{ builddir / '$variant-$version/Containerfile' }}
+    {{ require('cpp') }} -E -traditional container/Containerfile.in ${flags[@]} > {{ builddir / '$variant-$version/Containerfile' }}
     labels="LABEL"
     for l in "${LABELS[@]}"; do
         if [[ "$l" != "--label" ]]; then
@@ -249,7 +263,7 @@ build-container $variant="" $version="":
     sed -i '/^$/d;/^#.*$/d' {{ builddir / '$variant-$version/Containerfile' }}
 
     # Build Image
-    {{ podman }} build -f Containerfile.in "${BUILD_ARGS[@]}" "${LABELS[@]}" "${TAGS[@]}" {{ justfile_dir() }}
+    {{ podman }} build -f container/Containerfile.in "${BUILD_ARGS[@]}" "${LABELS[@]}" "${TAGS[@]}" {{ justfile_dir() }}/container
 
     ## Temporary HACK
     ## build samba extension
@@ -431,8 +445,8 @@ secureboot variant="" version="":
     mkdir -p {{ builddir / '$variant-$version' }}
     cd {{ builddir / '$variant-$version' }}
     set ${CI:+-x} -euo pipefail
-    kernel_release=$({{ podman }} inspect $image_name:$version --format '{{{{ index .Labels "ostree.linux" }}')
-    TMP=$({{ podman }} create localhost/$image_name:$version bash)
+    kernel_release=$({{ podman }} inspect $image_name:$image_tag --format '{{{{ index .Labels "ostree.linux" }}')
+    TMP=$({{ podman }} create localhost/$image_name:$image_tag bash)
     TMPDIR="$(mktemp -d -p .)"
     trap 'rm -rf $TMPDIR' SIGINT EXIT
     {{ podman }} cp "$TMP":/usr/lib/modules/${kernel_release}/vmlinuz $TMPDIR/vmlinuz
@@ -467,10 +481,10 @@ push-to-registry $variant="" $version="" $destination="" $transport="":
     : "${destination:=$image_registry/$image_org}"
     : "${transport:="docker://"}"
 
-    declare -a TAGS=($({{ podman }} image list localhost/$image_name:$image_version --noheading --format 'table {{{{ .Tag }}'))
+    declare -a TAGS=($({{ podman }} image list localhost/$image_name:$image_tag --noheading --format 'table {{{{ .Tag }}'))
     for tag in "${TAGS[@]}"; do
         for i in {1..5}; do
-            {{ podman }} push {{ if env('COSIGN_PRIVATE_KEY', '') != '' { '--sign-by-sigstore-private-key=/tmp/cosign.key --sign-passphrase-file=/dev/null' } else { '' } }} "localhost/$image_name:$image_version" "$transport$destination/$image_name:$tag" 2>&1 && break || sleep $((5 * i));
+            {{ podman }} push {{ if env('COSIGN_PRIVATE_KEY', '') != '' { '--sign-by-sigstore-private-key=/tmp/cosign.key --sign-passphrase-file=/dev/null' } else { '' } }} "localhost/$image_name:$image_tag" "$transport$destination/$image_name:$tag" 2>&1 && break || sleep $((5 * i));
             if [[ $i -eq '5' ]]; then
                 exit 1
             fi
@@ -520,7 +534,7 @@ build-disk $variant="" $version="" $registry="": start-machine
     mkdir -p {{ builddir / '$variant-$version' }}
 
     # Process Template
-    cp iso_files/disk.toml {{ builddir / '$variant-$version/disk.toml' }}
+    cp BIB/disk.toml {{ builddir / '$variant-$version/disk.toml' }}
     sed -i "s|<SSHPUBKEY>|$(cat {{ PUBKEY }})|" {{ builddir / '$variant-$version/disk.toml' }}
 
     # Load image into rootful podman-machine
@@ -594,7 +608,7 @@ build-iso $variant="" $version="" $registry="": start-machine
     mkdir -p {{ builddir / '$variant-$version' }}
 
     # Process Template
-    cp iso_files/iso.toml {{ builddir / '$variant-$version/iso.toml' }}
+    cp BIB/iso.toml {{ builddir / '$variant-$version/iso.toml' }}
     sed -i "s|<URL>|$fq_name|" {{ builddir / '$variant-$version/iso.toml' }}
     if [[ $registry == "localhost" ]]; then
         sed -i "s|<SIGPOLICY>||" {{ builddir / '$variant-$version/iso.toml' }}
