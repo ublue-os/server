@@ -424,7 +424,7 @@ build-disk $variant="" $version="" $registry="": start-machine
     mkdir -p {{ builddir / '$variant-$version' }}
 
     # Process Template
-    cp bib/disk.toml {{ builddir / '$variant-$version/disk.toml' }}
+    cp BIB/disk.toml {{ builddir / '$variant-$version/disk.toml' }}
     sed -i "s|<SSHPUBKEY>|$(cat {{ PUBKEY }})|" {{ builddir / '$variant-$version/disk.toml' }}
 
     # Load image into rootful podman-machine
@@ -498,7 +498,7 @@ build-iso $variant="" $version="" $registry="": start-machine
     mkdir -p {{ builddir / '$variant-$version' }}
 
     # Process Template
-    cp bib/iso.toml {{ builddir / '$variant-$version/iso.toml' }}
+    cp BIB/iso.toml {{ builddir / '$variant-$version/iso.toml' }}
     sed -i "s|<URL>|$fq_name|" {{ builddir / '$variant-$version/iso.toml' }}
     if [[ $registry == "localhost" ]]; then
         sed -i "s|<SIGPOLICY>||" {{ builddir / '$variant-$version/iso.toml' }}
