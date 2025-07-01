@@ -349,8 +349,8 @@ secureboot variant="" version="":
     mkdir -p {{ builddir / '$variant-$version' }}
     cd {{ builddir / '$variant-$version' }}
     set ${CI:+-x} -euo pipefail
-    kernel_release=$({{ podman }} inspect $image_name:$version --format '{{{{ index .Labels "ostree.linux" }}')
-    TMP=$({{ podman }} create localhost/$image_name:$version bash)
+    kernel_release=$({{ podman }} inspect $image_name:$image_tag --format '{{{{ index .Labels "ostree.linux" }}')
+    TMP=$({{ podman }} create localhost/$image_name:$image_tag bash)
     TMPDIR="$(mktemp -d -p .)"
     trap 'rm -rf $TMPDIR' SIGINT EXIT
     {{ podman }} cp "$TMP":/usr/lib/modules/${kernel_release}/vmlinuz $TMPDIR/vmlinuz
