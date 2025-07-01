@@ -88,6 +88,7 @@ build $ext="" $variant="" $version="":
     {{ just }} download-rpms $ext $variant $version
     {{ just }} download-manual $ext $variant $version
     {{ just }} version $ext $variant $version
+    {{ just }} inputs $ext $variant $version
 
 
 clean $ext="" $variant="" $version="":
@@ -287,6 +288,57 @@ version $ext="" $variant="" $version="":
     # Only one package listed, let's use its version
     rpm="$(ls rpms/${packages[0]}*.rpm | sort -h | head -1)"
     package_version "${rpm}"
+
+inputs $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+    cd {{ ext }}
+    echo "🏷️ Writing down inputs"
+
+    # Make sure that we always have a version set
+    version=""
+    if [[ -f ./version ]]; then
+        version="$(cat ./version)"
+    else
+        version=$(podman run {{podman_opts}} "$source_image" \
+            bash -c 'source /etc/os-release ; echo -n ${OSTREE_VERSION}')
+    fi
+    # Remove special characters from the version
+    version="$(cat ./version | sed "s/\^/_/" | sed "s/:/_/")"
+    # Write back version to file
+    echo "${version}" > ./version
+
+    # Get and store name, tag and digest for the container image used to build the sysext
+    echo ""$source_image"@$(podman inspect "$source_image" | jq -r '.[0].Digest')" > ./digest
+
+    # Store version_id (Fedora release)
+    version_id=$(podman run {{podman_opts}} "$source_image" \
+        bash -c 'source /etc/os-release ; echo -n ${VERSION_ID}')
+    echo "${version_id}" > ./version_id
+
+    # Store the hashes of the RPMs used to build the sysext
+    if [[ -d ./rpms ]]; then
+        cd rpms
+        sha256sum *.rpm >> ../inputs
+        cd ..
+    fi
+    # Store the hashes of all the files added to the sysext
+    # if [[ -n "files" ]]; then
+    #     for f in files; do
+    #         find ${f} -type f | sort -h | xargs sha256sum >> ./inputs
+    #     done
+    # fi
+    # Make sure that we have an inputs file in all cases
+    touch ./inputs
+
+    # Store the hashes of the scripts used to build the sysext
+    sha256sum ../Justfile >> ./scripts
+    cd ..
+    sha256sum extensions.yaml >> ./${ext}/scripts
 
 [group('Utility')]
 explode-yaml:
