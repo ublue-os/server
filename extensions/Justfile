@@ -55,6 +55,8 @@ pre_commands="$(ext-get-array pre_commands)"
 copr_repos="$(ext-get-array copr_repos)"
 rpm_fusion_repos="$(ext-get-array rpm_fusion_repos)"
 upholds_list="$(ext-get-array upholds)"
+files="$(ext-get-array files)"
+
 '
 
 [group('Utility')]
@@ -91,6 +93,10 @@ build $ext="" $variant="" $version="":
     {{ just }} version $ext $variant $version
     {{ just }} inputs $ext $variant $version
     {{ just }} setup-rootfs $ext $variant $version
+    {{ just }} install-rpms $ext $variant $version
+    {{ just }} install-files $ext $variant $version
+    {{ just }} install-manual $ext $variant $version
+
 
 prepare-build $ext="" $variant="" $version="":
     #!/usr/bin/env bash
@@ -106,10 +112,10 @@ prepare-build $ext="" $variant="" $version="":
 
 resume-build $ext="" $variant="" $version="":
     {{ just }} setup-rootfs $ext $variant $version
+    {{ just }} install-rpms $ext $variant $version
+    {{ just }} install-files $ext $variant $version
+    {{ just }} install-manual $ext $variant $version
 
-    # install-rpms \
-    # install-files \
-    # install-manual \
     # move-etc \
     # validate \
     # (reset-selinux-labels target arch) \
@@ -433,6 +439,74 @@ setup-rootfs $ext="" $variant="" $version="":
         echo "EXTENSION_RELOAD_MANAGER=1"
     fi
     } | ${SUDO} tee "usr/lib/extension-release.d/extension-release.$name" > /dev/null
+
+install-rpms $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+
+    # Skip this step if we have not been asked to install packages
+    if [[ -z "$packages" ]]; then
+        exit 0
+    fi
+
+    if [[ "${UID}" == "0" ]]; then
+        SUDO=""
+    else
+        SUDO="sudo"
+    fi
+    cd {{ ext }}/rootfs
+
+    echo "📦 Extracting packages:"
+    for rpm in ../rpms/*.rpm; do
+        echo "$(basename ${rpm})"
+        rpm2cpio "${rpm}" | ${SUDO} cpio -idmv &> /dev/null
+    done
+
+install-files $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+    # Skip this step if we have not been asked to copy files
+    if [[ -z "$files" ]]; then
+        exit 0
+    fi
+
+    if [[ "${UID}" == "0" ]]; then
+        SUDO=""
+    else
+        SUDO="sudo"
+    fi
+
+    cd {{ ext }}/rootfs
+
+    echo "📁 Copying additional files from: $files"
+    for f in $files; do
+        ${SUDO} cp -a ../${f} .
+    done
+
+install-manual $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+    cd {{ ext }}
+    # Skip this step if there is no file named "install-manual.sh" in the extension directory
+    if [[ ! -f "install-manual.sh" ]]; then
+        echo "❌ Skipping manual install, no 'install-manual.sh' script found in the extension directory."
+        exit 0
+    fi
+
+    echo "📁 Installing manual files"
+    bash -xc "install-manual.sh"
 
 
 [group('Utility')]
