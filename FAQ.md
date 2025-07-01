@@ -8,16 +8,16 @@
 4. [Common Issues](#common-issues)
 
 ### Images
-Cayo currently offers two primary images: one based on CentOS Stream 10 and another on Fedora 42. The rationale for providing both images addresses hardware compatibility.  
+Cayo currently offers two primary images: one based on CentOS 10 and another on Fedora 42. The rationale for providing both images addresses hardware compatibility.
 
-Specifically, the CentOS-based image necessitates a CPU that meets [x86-64-v3 requirements](https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels).  At this point in time, Fedora 42 does not have this hardware limitation.
-- https://ghcr.io/ublue-os/cayo:10 (CentOS)
-- https://ghcr.io/ublue-os/cayo:42 (Fedora)
+Specifically, the CentOS-based image necessitates a CPU that meets [x86-64-v3 requirements](https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels).  At this point in time, Fedora does not have this hardware limitation.
+- https://ghcr.io/ublue-os/cayo:centos (CentOS)
+- https://ghcr.io/ublue-os/cayo:fedora (Fedora)
 
 ## Installation
-Multiple methods are available for installing Cayo.  
+Multiple methods are available for installing Cayo.
 
-The following sections describe installation procedures based on the official [bootc install methods](https://docs.fedoraproject.org/en-US/bootc/bare-metal/) documentation.  
+The following sections describe installation procedures based on the official [bootc install methods](https://docs.fedoraproject.org/en-US/bootc/bare-metal/) documentation.
 __NOTE:__ _This section is a work in progress_.
 
 ### Anaconda [Work In Progress]
@@ -27,15 +27,15 @@ An Anaconda based ISO installer is currently under development.  Please check ba
 One of the most straightforward installation methods currently available (at the time of this writing) involves booting from a [Fedora CoreOS Live DVD ISO](https://fedoraproject.org/coreos/download?stream=stable).
 
 #### Minimum Memory Requirements for Podman Based Install
-Due to the installation process running from within a RAM disk, it's crucial that the target machine has adequate RAM to avoid "out of space" errors.  
+Due to the installation process running from within a RAM disk, it's crucial that the target machine has adequate RAM to avoid "out of space" errors.
 
 The following minimum RAM allocations are recommended for successful installations of Cayo images via Podman:
-- Cayo:10 (CentOS base) - 8GB RAM minimum
-- Cayo:42 (Fedora base) - 12GB RAM minimum
+- `cayo:centos` - 8GB RAM minimum
+- `cayo:fedora` - 12GB RAM minimum
 
 The allocated RAM can be scaled back after the installation is complete, as the additional RAM is only required for temporary package files that are downloaded and extracted during the installation phase.
 
-An authorized key file is required for the `root` user to enable SSH access after installation.  
+An authorized key file is required for the `root` user to enable SSH access after installation.
 
 The following steps illustrate how the author achieved this on a virtual machine booted from the Fedora CoreOS Live DVD.
 
@@ -67,7 +67,7 @@ bootc install to-disk /dev/sda --root-ssh-authorized-keys /temp/authorized_keys
 ```
 
 #### Cayo:42 (Fedora) Install:
-The following command assumes the target hard drive is `/dev/sda` and the `authorized_keys` file has been created as described above.  
+The following command assumes the target hard drive is `/dev/sda` and the `authorized_keys` file has been created as described above.
 
 __NOTE:__  Fedora-based installations require explicit specification of the root filesystem type, using the `bootc` argument `--filesystem` at install.
 ```
@@ -83,13 +83,13 @@ bootc install to-disk /dev/sda --root-ssh-authorized-keys /temp/authorized_keys 
 ```
 
 ## Common Issues
-- __Podman install errors out with "out of space" issues.__  
-Verify that sufficient RAM has been allocated for the RAM disk.  The minimum recommended values are 8GB for Cayo:10 and 12GB for Cayo:42.  
+- __Podman install errors out with "out of space" issues.__
+Verify that sufficient RAM has been allocated for the RAM disk.  The minimum recommended values are 8GB for Cayo:10 and 12GB for Cayo:42.
 
-- __Unable to log in after installation.__  
-Confirm that the `--root-ssh-authorized-keys` argument was provided to the `bootc` command during installation.  
+- __Unable to log in after installation.__
+Confirm that the `--root-ssh-authorized-keys` argument was provided to the `bootc` command during installation.
 
-- __Installation fails, unable to find `--root-ssh-authorized-keys` file.__  
+- __Installation fails, unable to find `--root-ssh-authorized-keys` file.__
 The path provided to bootc refers to the path within _the container_, not the host RAM disk environment.  In the examples provided `/temp` inside the container was mapped from `~/.ssh` inside the RAM disk environment.
 
 ## Disclaimer

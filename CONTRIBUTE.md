@@ -45,7 +45,7 @@ Before making significant changes to something which already exists, please disc
 
 ## Code Development
 
-The same documentation and Conventional Commits links from above apply to code contributors. 
+The same documentation and Conventional Commits links from above apply to code contributors.
 
 Definitely discuss any potential significant changes with the team, either in GitHub or Discord, before starting. Better communication up front leads to better interactions and a more welcome response to contributed code.
 
@@ -85,12 +85,12 @@ At any time you can pass an empty string `""` to use the default value for that 
 ```bash
 just build fedora 42
 ```
-This will build a `cayo:42` image from Fedora 42, which is the default of `just build`.
+This will build a `cayo:fedora42` image from Fedora 42, which is the default of `just build`.
 
 ```bash
 just build centos 10
 ```
-Which will build a `cayo:10` image from CentOS 10.
+Which will build a `cayo:centos10` image from CentOS 10.
 
 
 To see what the available recipes are and their parameters just run:
