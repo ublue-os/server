@@ -1,22 +1,31 @@
 ---
+cayo-base: &cayo-base
+  cppFlags: []
+  description: "A bootc server image with ZFS included"
+  name: cayo
+  org: ublue-os
+  registry: ghcr.io
+  repo: cayo
+centos-base: &centos-base
+  cppFlags: ["CENTOS"]
+  upstream: centos
+fedora-base: &fedora-base
+  cppFlags: ["FEDORA"]
+  upstream: fedora
 centos-10: &centos-10
+  <<: *centos-base
   # TODO: Implement a Renovate Regex
   source: quay.io/centos-bootc/centos-bootc:stream10
   zfs: ghcr.io/ublue-os/akmods-zfs:centos-stream10
   version: 10
-  cppFlags: ["CENTOS"]
+  default: true
 fedora-42: &fedora-42
+  <<: *fedora-base
   # TODO: Implement a Renovate Regex
   source: quay.io/fedora/fedora-bootc:42
   zfs: ghcr.io/ublue-os/akmods-zfs:longterm-6.12-42
   version: 42
-  cppFlags: ["FEDORA"]
-cayo-base: &cayo-base
-  org: ublue-os
-  registry: ghcr.io
-  repo: cayo
-  cppFlags: []
-  name: cayo
+  default: true
 
 defaults:
   variant: fedora
@@ -27,12 +36,10 @@ images:
     !!merge <<: 
       - *centos-10
       - *cayo-base
-    description: "A bootc server image with ZFS included"
   cayo-fedora-42:
     !!merge <<:
       - *fedora-42
       - *cayo-base
-    description: "A bootc server image with ZFS included"
   rechunker:
     # TODO: Add Renovate Regex configuration
     source: ghcr.io/hhd-dev/rechunk:v1.2.2@sha256:e799d89f9a9965b5b0e89941a9fc6eaab62e9d2d73a0bfb92e6a495be0706907
