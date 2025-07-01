@@ -3,3 +3,213 @@ set unstable := true
 just := just_executable()
 podman := require('podman')
 podman-remote := which('podman-remote') || podman + ' --remote'
+ext := env('CAYO_EXT',  shell('yq ".defaults.extension" extensions.yaml'))
+variant := env('CAYO_VARIANT', shell('yq ".defaults.variant" extensions.yaml'))
+version := env('CAYO_VERSION', shell('yq ".defaults.version" extensions.yaml'))
+# print more logs to help debugging. Enable by setting CAYO_DEBUG env variable.
+# Defaut to false.
+debug := env('CAYO_DEBUG', '')
+dnf_arch := env('CAYO_DNF_ARCH', 'x86_64')
+arch := "x86_64"
+# Default podman options
+podman_opts := "--rm --arch=" + arch + " --security-opt label=disable"
+
+
+[private]
+default-inputs := '
+: ${ext:=' + ext + '}
+: ${variant:=' + variant + '}
+: ${version:=' + version + '}
+'
+
+[private]
+get-names := 'function ext-get() {
+    if [ -z "$1" ]; then
+      echo "ext-get: requires a key argument"
+      exit 1
+    fi
+    KEY="${1}"
+    data=$(IFS="" yq -Mr "explode(.)|.extensions|.' + ext + '-$variant-$version|.$KEY" extensions.yaml)
+    echo ${data}
+}
+function ext-get-array() {
+    if [ -z "$1" ]; then
+      echo "ext-get: requires a key argument"
+      exit 1
+    fi
+    KEY="${1}"
+    data=$(IFS="" yq -Mr "explode(.)|.extensions|.' + ext + '-$variant-$version|.$KEY[]" extensions.yaml)
+    echo ${data}
+}
+description="$(ext-get description)"
+external_repos="$(ext-get-array external_repos)"
+name="$(ext-get name)"
+source_image="$(ext-get image)"
+packages="$(ext-get-array packages)"
+exclude_packages="$(ext-get-array exclude_packages)"
+enable_repos="$(ext-get-array enable_repos)"
+disable_repos="$(ext-get-array disable_repos)"
+dnf_weak_deps="$(ext-get dnf_weak_deps)||true"
+pre_commands="$(ext-get-array pre_commands)"
+copr_repos="$(ext-get-array copr_repos)"
+rpm_fusion_repos="$(ext-get-array rpm_fusion_repos)"
+'
+
+[group('Utility')]
+check-valid-extension $ext="" $variant="" $version="":
+    #!/usr/bin/env bash
+    set -e
+    {{ default-inputs }}
+    data=$(IFS='' yq -Mr "explode(.)|.extensions|.{{ ext }}-$variant-$version" extensions.yaml)
+    if [[ "null" == "$data" ]]; then
+        echo "ERROR Invalid inputs: no matching extension definition found for: {{ ext }}-${variant}-${version}"
+        exit 1
+    fi
+
+check $ext="" $variant="" $version="":
+    #!/usr/bin/env bash
+    set -e
+    {{ default-inputs }}
+    {{ get-names }}
+    echo Name: $name
+    echo Description: $description
+    echo Source Image: $source_image
+    echo Packages: "${packages[@]}"
+    echo External Repo: $external_repo
+
+build $ext="" $variant="" $version="":
+    #!/usr/bin/env bash
+    set -e
+    {{ default-inputs }}
+    {{ get-names }}
+    echo building: $ext-$variant-$version
+    {{ just }} clean $ext $variant $version
+    {{ just }} download-rpms $ext $variant $version
+
+
+clean $ext="" $variant="" $version="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    {{ default-inputs }}
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+
+    if [[ "${UID}" == "0" ]]; then
+        SUDO=""
+    else
+        SUDO="sudo"
+    fi
+    # change to the $ext directory
+    cd {{ ext }}
+
+    echo "🧹 Cleaning up files from previous builds"
+    rm -rf inputs scripts digest version version_id
+    rm -rf ./rpms
+    rm -rf ./binaries
+    ${SUDO} rm -rf ./rootfs
+    rm -f ./*.raw
+
+download-rpms $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+
+    {{ get-names }}
+    # Skip this step if we have not been asked to download packages
+    if [[ -z "$packages" ]]; then
+        exit 0
+    fi
+    # change to the $ext directory
+    cd {{ ext }}
+    enablerepos=""
+    if [[ -n "$enable_repos" ]]; then
+        for r in $enable_repos; do
+            echo "➕ Enabling repo: ${r}"
+            enablerepos+=" --enablerepo=${r}"
+        done
+    fi
+
+    disablerepos=""
+    if [[ -n "$disable_repos" ]]; then
+        for r in $disable_repos; do
+            echo "➖ Disabling repo: ${r}"
+            disablerepos+=" --disablerepo=${r}"
+        done
+    fi
+
+    dnf_arch=""
+    if [[ -z "{{dnf_arch}}" ]]; then
+        dnf_arches="noarch {{arch}}"
+    else
+        dnf_arches="{{dnf_arch}}"
+    fi
+    for a in ${dnf_arches}; do
+        dnf_arch+="--arch=${a} "
+    done
+
+    dnf_opts=""
+    if [[ "$dnf_weak_deps" == false ]]; then
+        dnf_opts="--setopt=install_weak_deps=False"
+    fi
+    if [[ -n "$exclude_packages" ]]; then
+        excluded_packages="$(echo "$exclude_packages" | xargs)"
+        for p in ${excluded_packages}; do
+            echo "➖ Excluding package: ${p}"
+            dnf_opts+=" --exclude=${p}"
+        done
+    fi
+
+    packages="$(echo "${packages[@]}" | xargs)"
+
+    pre_commands=""
+    if [[ -n "$pre_commands" ]]; then
+        pre_commands+="${pre_commands[@]} ; "
+    fi
+    if [[ -n "${copr_repos[@]}" ]]; then
+        pre_commands+="dnf install -y dnf5-plugins"
+        for r in "${copr_repos[@]}"; do
+            pre_commands+=" ; dnf copr enable -y ${r}"
+        done
+        pre_commands+=" ; "
+    fi
+    if [[ -n "$external_repos" ]]; then
+        pre_commands+="dnf install -y dnf5-plugins"
+        for r in "${external_repos[@]}"; do
+            pre_commands+=" ; dnf config-manager addrepo --from-repofile=${r}"
+        done
+        pre_commands+=" ; "
+    fi
+
+    if [[ -n "$rpm_fusion_repos" ]]; then
+        release=$(podman run {{podman_opts}} "$source_image" \
+            bash -c 'rpm -E %fedora' | tr -d '\n')
+        for r in ${rpm_fusion_repos[@]}; do
+            if [[ "${r}" != "free" ]] && [[ "${r}" != "nonfree" ]]; then
+                echo "Unrecognized RPM Fusion repo: ${r}"
+                exit 1
+            fi
+            echo "➕ Enabling RPM Fusion repo: '${r}'"
+            pre_commands+=" dnf install -y https://mirrors.rpmfusion.org/${r}/fedora/rpmfusion-${r}-release-${release}.noarch.rpm ;"
+        done
+    fi
+
+    mkdir -p ../.dnf-cache
+
+    mkdir rpms
+    cd rpms
+
+    echo "⬇️ Downloading packages (${dnf_arches}): ${packages[@]}"
+    {{ podman }} run -ti {{podman_opts}} \
+        --volume "${PWD}:/var/srv" \
+        --volume "${PWD}/../../.dnf-cache:/var/cache/libdnf5" \
+        --workdir "/var/srv" \
+        "$source_image" \
+        bash -xc "export FORCE_COLUMNS=100 && ${pre_commands}dnf download --resolve ${dnf_arch} ${dnf_opts} ${disablerepos} ${enablerepos} ${packages}"
+
+
+[group('Utility')]
+explode-yaml:
+    yq -r "explode(.)|.extensions" extensions.yaml
