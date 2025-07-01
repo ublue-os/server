@@ -9,9 +9,17 @@ fedora-42: &fedora-42
 vim-base: &vim-base
   description: "VIM Editor"
   name: vim
+  packages:
+    - vim
 docker-ce-base: &docker-ce-base
   description: "Docker CE"
   name: docker-ce
+  packages:
+    - docker-ce
+    - docker-ce-cli
+    - containerd.io
+    - docker-buildx-plugin
+    - docker-compose-plugin
   files:
     - usr
 
