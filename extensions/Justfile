@@ -54,6 +54,7 @@ dnf_weak_deps="$(ext-get dnf_weak_deps)||true"
 pre_commands="$(ext-get-array pre_commands)"
 copr_repos="$(ext-get-array copr_repos)"
 rpm_fusion_repos="$(ext-get-array rpm_fusion_repos)"
+upholds_list="$(ext-get-array upholds)"
 '
 
 [group('Utility')]
@@ -89,7 +90,30 @@ build $ext="" $variant="" $version="":
     {{ just }} download-manual $ext $variant $version
     {{ just }} version $ext $variant $version
     {{ just }} inputs $ext $variant $version
+    {{ just }} setup-rootfs $ext $variant $version
 
+prepare-build $ext="" $variant="" $version="":
+    #!/usr/bin/env bash
+    set -e
+    {{ default-inputs }}
+    {{ get-names }}
+    echo building: $ext-$variant-$version
+    {{ just }} clean $ext $variant $version
+    {{ just }} download-rpms $ext $variant $version
+    {{ just }} download-manual $ext $variant $version
+    {{ just }} version $ext $variant $version
+    {{ just }} inputs $ext $variant $version
+
+resume-build $ext="" $variant="" $version="":
+    {{ just }} setup-rootfs $ext $variant $version
+
+    # install-rpms \
+    # install-files \
+    # install-manual \
+    # move-etc \
+    # validate \
+    # (reset-selinux-labels target arch) \
+    # (build-erofs target arch)
 
 clean $ext="" $variant="" $version="":
     #!/usr/bin/env bash
@@ -339,6 +363,77 @@ inputs $ext="" $variant="" $version="":
     sha256sum ../Justfile >> ./scripts
     cd ..
     sha256sum extensions.yaml >> ./${ext}/scripts
+
+setup-rootfs $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+    cd {{ ext }}
+
+    if [[ "${UID}" == "0" ]]; then
+        SUDO=""
+    else
+        SUDO="sudo"
+    fi
+
+    version_id="$(cat ./version_id)"
+
+    mkdir rootfs
+    cd rootfs
+
+    # Only ask systemd to reload its configuration if we have services to
+    # uphold / start on boot
+    reload_manager="false"
+
+    # Filter the variable into an array
+    upholds=()
+    mapfile -t upholds_raw <<< "$upholds_list"
+    for uphold in "${upholds_raw[@]}"; do
+        if [[ -z "${uphold}" ]]; then
+            continue
+        fi
+        upholds+=("${uphold}")
+    done
+    # Setup upholds if there are any
+    if [[ "${#upholds[@]}" -ne 0 ]]; then
+        # Set now, but will be used later in the extension config file
+        reload_manager="true"
+        echo "➡️ Setting up upholds for: ${upholds[@]}"
+        ${SUDO} install -d -m 0755 -o 0 -g 0 usr/lib/systemd/system/multi-user.target.d
+        {
+        echo "[Unit]"
+        for uphold in "${upholds[@]}"; do
+            echo "Upholds=${uphold}"
+        done
+        } | ${SUDO} tee "usr/lib/systemd/system/multi-user.target.d/10-$name-sysext.conf" > /dev/null
+    fi
+
+    # Post process architecture to match systemd architecture list
+    if [[ {{ arch }} == "x86_64" ]]; then
+        arch="x86-64"
+    elif [[ $arch == "aarch64" ]]; then
+        arch="arm64"
+    else
+        echo "Unsupported architecture"
+        exit 1
+    fi
+
+    echo "➡️ Setting up extension config file"
+    ${SUDO} install -d -m0755 usr/lib/extension-release.d
+    {
+    # We can not restict the ID to `fedora` here as it will break support for
+    # Universal Blue. See: https://github.com/systemd/systemd/pull/37648
+    echo "ID=\"$variant\""
+    echo "VERSION_ID=\"${version_id}\""
+    echo "ARCHITECTURE=\"${arch}\""
+    if [[ "${reload_manager}"  == "true" ]]; then
+        echo "EXTENSION_RELOAD_MANAGER=1"
+    fi
+    } | ${SUDO} tee "usr/lib/extension-release.d/extension-release.$name" > /dev/null
+
 
 [group('Utility')]
 explode-yaml:

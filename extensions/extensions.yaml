@@ -12,6 +12,8 @@ vim-base: &vim-base
 docker-ce-base: &docker-ce-base
   description: "Docker CE"
   name: docker-ce
+  upholds:
+    - "docker.socket"
   packages:
     - docker-ce
     - docker-ce-cli
