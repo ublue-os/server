@@ -1,0 +1,5 @@
+set unstable := true
+
+just := just_executable()
+podman := require('podman')
+podman-remote := which('podman-remote') || podman + ' --remote'

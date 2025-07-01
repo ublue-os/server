@@ -1,0 +1,43 @@
+---
+# source images for extensions
+centos-10: &centos-10
+  image: "localhost/cayo:centos10"
+fedora-42: &fedora-42
+  image: "localhost/cayo:fedora42"
+
+# extension base definitions
+vim-base: &vim-base
+  description: "VIM Editor"
+  name: vim
+docker-ce-base: &docker-ce-base
+  description: "Docker CE"
+  name: docker-ce
+  files:
+    - usr
+
+# extension upstream overrides
+docker-ce-fedora: &docker-ce-fedora
+  external_repo: "https://somefedora.repo"
+docker-ce-centos: &docker-ce-centos
+  external_repo: "https://somecentos.repo"
+
+
+extensions:
+  vim-centos-10:
+    !!merge <<:
+      - *centos-10
+      - *vim-base
+  vim-fedora-42:
+    !!merge <<:
+      - *fedora-42
+      - *vim-base
+  docker-ce-centos-10:
+    !!merge <<:
+      - *centos-10
+      - *docker-ce-centos
+      - *docker-ce-base
+  docker-ce-fedora-42:
+    !!merge <<:
+      - *fedora-42
+      - *docker-ce-fedora
+      - *docker-ce-base
