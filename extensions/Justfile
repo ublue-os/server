@@ -44,6 +44,7 @@ function ext-get-array() {
 description="$(ext-get description)"
 external_repos="$(ext-get-array external_repos)"
 name="$(ext-get name)"
+version_package="$(ext-get version_package)"
 source_image="$(ext-get image)"
 packages="$(ext-get-array packages)"
 exclude_packages="$(ext-get-array exclude_packages)"
@@ -85,6 +86,8 @@ build $ext="" $variant="" $version="":
     echo building: $ext-$variant-$version
     {{ just }} clean $ext $variant $version
     {{ just }} download-rpms $ext $variant $version
+    {{ just }} download-manual $ext $variant $version
+    {{ just }} version $ext $variant $version
 
 
 clean $ext="" $variant="" $version="":
@@ -125,7 +128,7 @@ download-rpms $ext="" $variant="" $version="":
     # change to the $ext directory
     cd {{ ext }}
     enablerepos=""
-    if [[ -n "$enable_repos" ]]; then
+    if [[ -n "$enable_repos" && "$enable_repos" != "null" ]]; then
         for r in $enable_repos; do
             echo "➕ Enabling repo: ${r}"
             enablerepos+=" --enablerepo=${r}"
@@ -133,7 +136,7 @@ download-rpms $ext="" $variant="" $version="":
     fi
 
     disablerepos=""
-    if [[ -n "$disable_repos" ]]; then
+    if [[ -n "$disable_repos"  && "$disable_repos" != "null" ]]; then
         for r in $disable_repos; do
             echo "➖ Disabling repo: ${r}"
             disablerepos+=" --disablerepo=${r}"
@@ -165,7 +168,7 @@ download-rpms $ext="" $variant="" $version="":
     packages="$(echo "${packages[@]}" | xargs)"
 
     pre_commands=""
-    if [[ -n "$pre_commands" ]]; then
+    if [[ -n "$pre_commands" && "$pre_commands" != "null" ]]; then
         pre_commands+="${pre_commands[@]} ; "
     fi
     if [[ -n "${copr_repos[@]}" ]]; then
@@ -175,7 +178,7 @@ download-rpms $ext="" $variant="" $version="":
         done
         pre_commands+=" ; "
     fi
-    if [[ -n "$external_repos" ]]; then
+    if [[ -n "$external_repos" && "$external_repos" != "null" ]]; then
         pre_commands+="dnf install -y dnf5-plugins"
         for r in "${external_repos[@]}"; do
             pre_commands+=" ; dnf config-manager addrepo --from-repofile=${r}"
@@ -183,7 +186,7 @@ download-rpms $ext="" $variant="" $version="":
         pre_commands+=" ; "
     fi
 
-    if [[ -n "$rpm_fusion_repos" ]]; then
+    if [[ -n "$rpm_fusion_repos" && "$rpm_fusion_repos" != "null" ]]; then
         release=$(podman run {{podman_opts}} "$source_image" \
             bash -c 'rpm -E %fedora' | tr -d '\n')
         for r in ${rpm_fusion_repos[@]}; do
@@ -209,6 +212,81 @@ download-rpms $ext="" $variant="" $version="":
         "$source_image" \
         bash -xc "export FORCE_COLUMNS=100 && ${pre_commands}dnf download --resolve ${dnf_arch} ${dnf_opts} ${disablerepos} ${enablerepos} ${packages}"
 
+
+download-manual $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+
+    {{ get-names }}
+    cd {{ ext }}
+    # Skip this step if there is no file named "download-manual.sh" in the extension directory
+    if [[ ! -f "download-manual.sh" ]]; then
+        echo "❌ Skipping manual download, no 'download-manual.sh' script found in the extension directory."
+        exit 0
+    fi
+
+    echo "⬇️ Downloading manual files"
+    {{ podman }} run -ti {{podman_opts}} \
+        --volume "${PWD}:/var/srv" \
+        --workdir "/var/srv" \
+        "$source_image" \
+        bash -xc "download-manual.sh"
+
+version $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+    cd {{ ext }}
+    package_version() {
+        rpm="${1}"
+        epoch="$(rpm -qp --queryformat '%{EPOCH}' ${rpm})"
+        version="$(rpm -qp --queryformat '%{VERSION}-%{RELEASE}' ${rpm})"
+        if [[ "${epoch}" == "(none)" ]]; then
+            epoch=""
+        else
+            epoch="${epoch}-"
+        fi
+        echo "${epoch}${version}" > ./version
+    }
+
+    echo "🏷️ Writing down version"
+
+    if [[ -n "$version_package"  && "$version_package" != "null" ]]; then
+        if [[ $(ls rpms/*.rpm | grep -cE "^rpms/$version_package-[0-9]" ) -ne 1 ]]; then
+            echo "More than one package matched: $version_package."
+            exit 1
+        fi
+        rpm="$(ls rpms/*.rpm | sort -h | grep -E "^rpms/$version_package-[0-9]" | head -1)"
+        package_version "${rpm}"
+        exit 0
+    fi
+
+    if [[ -z "$packages" ]]; then
+        echo "No package listed. You must define the 'version' recipe in your justfile for this sysext."
+        exit 1
+    fi
+
+    packages=($(echo "${packages[@]}" | xargs))
+
+    if [[ ${#packages[@]} -ne 1 ]]; then
+        if [[ $(ls rpms/*.rpm | grep -cE "^rpms/$name-[0-9]") -ne 1 ]]; then
+            echo "More that one package listed. Set 'version_package' or define the 'version' recipe in your justfile for this sysext."
+            exit 1
+        fi
+        rpm="$(ls rpms/*.rpm | sort -h | grep -E "^rpms/$name-[0-9]" | head -1)"
+        package_version "${rpm}"
+        exit 0
+    fi
+
+    # Only one package listed, let's use its version
+    rpm="$(ls rpms/${packages[0]}*.rpm | sort -h | head -1)"
+    package_version "${rpm}"
 
 [group('Utility')]
 explode-yaml:
