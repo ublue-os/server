@@ -22,6 +22,11 @@ docker-ce-base: &docker-ce-base
     - docker-compose-plugin
   files:
     - usr
+cockpit-zfs-base: &cockpit-zfs-base
+  description: "Cockpit ZFS Extension"
+  name: cockpit-zfs
+  version: "1.2.5"
+
 
 docker-ce-fedora: &docker-ce-fedora
   external_repos:

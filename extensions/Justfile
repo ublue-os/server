@@ -45,6 +45,7 @@ description="$(ext-get description)"
 external_repos="$(ext-get-array external_repos)"
 name="$(ext-get name)"
 version_package="$(ext-get version_package)"
+manual_version="$(ext-get version)"
 source_image="$(ext-get image)"
 packages="$(ext-get-array packages)"
 exclude_packages="$(ext-get-array exclude_packages)"
@@ -56,6 +57,8 @@ copr_repos="$(ext-get-array copr_repos)"
 rpm_fusion_repos="$(ext-get-array rpm_fusion_repos)"
 upholds_list="$(ext-get-array upholds)"
 files="$(ext-get-array files)"
+cleanup_files="$(ext-get-array files)"
+
 '
 
 [group('Utility')]
@@ -94,7 +97,11 @@ build $ext="" $variant="" $version="":
     {{ just }} setup-rootfs $ext $variant $version
     {{ just }} install-rpms $ext $variant $version
     {{ just }} install-files $ext $variant $version
+    {{ just }} build-manual $ext $variant $version
     {{ just }} install-manual $ext $variant $version
+    {{ just }} move-etc $ext $variant $version
+    {{ just }} validate $ext $variant $version
+    {{ just }} reset-selinux-labels $ext $variant $version
 
 
 prepare-build $ext="" $variant="" $version="":
@@ -113,11 +120,12 @@ resume-build $ext="" $variant="" $version="":
     {{ just }} setup-rootfs $ext $variant $version
     {{ just }} install-rpms $ext $variant $version
     {{ just }} install-files $ext $variant $version
+    {{ just }} build-manual $ext $variant $version
     {{ just }} install-manual $ext $variant $version
+    {{ just }} move-etc $ext $variant $version
+    {{ just }} validate $ext $variant $version
+    {{ just }} reset-selinux-labels $ext $variant $version
 
-    # move-etc \
-    # validate \
-    # (reset-selinux-labels target arch) \
     # (build-erofs target arch)
 
 clean $ext="" $variant="" $version="":
@@ -294,6 +302,11 @@ version $ext="" $variant="" $version="":
         fi
         rpm="$(ls rpms/*.rpm | sort -h | grep -E "^rpms/$version_package-[0-9]" | head -1)"
         package_version "${rpm}"
+        exit 0
+    fi
+
+    if [[ -n "$manual_version"  && "$manual_version" != "null" ]]; then
+        echo "${manual_version}" > ./version
         exit 0
     fi
 
@@ -490,6 +503,28 @@ install-files $ext="" $variant="" $version="":
         ${SUDO} cp -a ../${f} .
     done
 
+build-manual $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+    cd {{ ext }}
+    # Skip this step if there is no file named "install-manual.sh" in the extension directory
+    if [[ ! -f "build-manual.sh" ]]; then
+        echo "- Skipping manual build, no 'build-manual.sh' script found in the extension directory."
+        exit 0
+    fi
+
+    echo "📁 Building extension"
+      {{ podman }} run -ti {{podman_opts}} \
+        --volume "${PWD}:/var/srv" \
+        --workdir "/var/srv" \
+        "$source_image" \
+        bash -xc "./build-manual.sh"
+
+
 install-manual $ext="" $variant="" $version="":
     #!/bin/bash
     set -euo pipefail
@@ -500,12 +535,137 @@ install-manual $ext="" $variant="" $version="":
     cd {{ ext }}
     # Skip this step if there is no file named "install-manual.sh" in the extension directory
     if [[ ! -f "install-manual.sh" ]]; then
-        echo "❌ Skipping manual install, no 'install-manual.sh' script found in the extension directory."
+        echo "- Skipping manual install, no 'install-manual.sh' script found in the extension directory."
         exit 0
     fi
 
     echo "📁 Installing manual files"
     bash -xc "install-manual.sh"
+
+move-etc $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+
+    if [[ "${UID}" == "0" ]]; then
+        SUDO=""
+    else
+        SUDO="sudo"
+    fi
+    cd {{ ext }}/rootfs
+
+    if [[ -d ./etc ]] then
+        echo "➡️ Moving /etc to /usr/etc"
+        ${SUDO} mv --no-clobber --no-copy ./etc ./usr/etc
+    fi
+
+validate $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+    cd {{ ext }}
+    # Some checks vary by Fedora release
+    version_id="$(cat ./version_id)"
+
+    failed_checks=0
+
+    if [[ "${UID}" == "0" ]]; then
+        SUDO=""
+    else
+        SUDO="sudo"
+    fi
+
+    cd rootfs
+
+    # Remove files as requested
+    if [[ -n "$cleanup_files" && "$cleanup_files" != "null" ]]; then
+        cleanup=($(echo "$cleanup_files" | xargs))
+        for f in "${cleanup[@]}"; do
+            echo "🧹 Cleaning up file: ${f}"
+            rm ./${f}
+        done
+    fi
+
+    # Remove all empty directories in /var, /run and /opt
+    for d in 'var' 'run' 'opt'; do
+        if [[ -d "./${d}" ]]; then
+            echo "🧹 Cleaning up empty directories in /${d}"
+            ${SUDO} find "./${d}" -type d -empty -delete
+        fi
+    done
+
+    # Check sbin/bin merge starting with Fedora 42
+    # need to verify status of this on centos 10+
+    if [[ "${version_id}" -ge 42 ]] && [[ -d "usr/sbin" ]]; then
+        failed_checks=$((failed_checks+1))
+        echo "❌ Found /usr/sbin directory on Fedora 42+ sysext (see bin/sbin merge change)"
+        ls -alh usr/sbin
+    fi
+
+    # Check that /var is empty as it will be ignored
+    if [[ -d "var" ]]; then
+        failed_checks=$((failed_checks+1))
+        echo "❌ Found /var directory, which will be ignored: clear it or convert it to a tmpfiles.d config"
+        ls -alh var
+    fi
+
+    # Check that /run is empty as it will be ignored
+    if [[ -d "run" ]]; then
+        failed_checks=$((failed_checks+1))
+        echo "❌ Found /run directory, which will be ignored: clear it or convert it to a tmpfiles.d config"
+        ls -alh run
+    fi
+
+    # Check that we don't use /opt as it will not work
+    if [[ -d "opt" ]]; then
+        failed_checks=$((failed_checks+1))
+        echo "❌ Found /opt directory, which will not work: move the content to /usr/lib"
+        ls -alh opt
+    fi
+
+    # Check that we don't have other directories as they will be ignored
+    if [[ "$(ls | grep -cvE "^usr$|^run$|^var$|^opt$")" -ne 0 ]]; then
+        failed_checks=$((failed_checks+1))
+        echo "❌ Found other directories which will be ignored: move them or clear them"
+        ls | grep -vE "^usr$|^run$|^var$|^opt$"
+    fi
+
+    if [[ "${failed_checks}" -ne 0 ]]; then
+        exit 1
+    fi
+reset-selinux-labels $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+
+    if [[ "${UID}" == "0" ]]; then
+        SUDO=""
+    else
+        SUDO="sudo"
+    fi
+
+    {{ get-names }}
+    cd {{ ext }}
+
+    # Only install the packages in the container if we have an SELinux policy
+    # module in the sysext and might thus need specific labels
+    pre_commands=""
+    filecontexts="/etc/selinux/targeted/contexts/files/file_contexts"
+    echo "🏷️ Resetting SELinux labels"
+    podman run -ti {{podman_opts}} \
+        --volume "${PWD}:/var/srv" \
+        --volume "${PWD}/../.dnf-cache:/var/cache/libdnf5" \
+        --workdir "/var/srv" \
+        --privileged \
+        "$source_image" \
+        bash -c "${pre_commands}cd rootfs && setfiles -r . ${filecontexts} . && chcon --user=system_u --recursive ."
 
 
 [group('Utility')]

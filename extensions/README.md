@@ -46,11 +46,13 @@ docker-ce-fedora-42:
 
 TODO
 
-## Build Process
+## Build Steps
 
 `clean`:
+The clean step removes previous artifacts from the extension's directory.
 
 `download-rpms`:
+The download-rpms step downloads rpms required to install the packages in the package list. If specified it will also enable/disable repositories and add external repositories.
 
 `download-manual`:
 
