@@ -3,6 +3,8 @@ set unstable := true
 just := just_executable()
 podman := require('podman')
 podman-remote := which('podman-remote') || podman + ' --remote'
+builddir := shell('mkdir -p $1 && echo $1', absolute_path(env('CAYO_BUILD', '../build')))
+
 ext := env('CAYO_EXT',  shell('yq ".defaults.extension" extensions.yaml'))
 variant := env('CAYO_VARIANT', shell('yq ".defaults.variant" extensions.yaml'))
 version := env('CAYO_VERSION', shell('yq ".defaults.version" extensions.yaml'))
@@ -638,8 +640,12 @@ validate $ext="" $variant="" $version="":
     if [[ "${failed_checks}" -ne 0 ]]; then
         exit 1
     fi
-reset-selinux-labels $ext="" $variant="" $version="":
+reset-selinux-labels $ext="" $variant="" $version="": start-machine
     #!/bin/bash
+    {{ default-inputs }}
+    : "${registry:=localhost}"
+    {{ get-names }}
+    fq_name="$registry/$image_name:$version"
     set -euo pipefail
     if [[ -n "{{debug}}" ]]; then
       set -x
@@ -651,7 +657,6 @@ reset-selinux-labels $ext="" $variant="" $version="":
         SUDO="sudo"
     fi
 
-    {{ get-names }}
     cd {{ ext }}
 
     # Only install the packages in the container if we have an SELinux policy
@@ -690,9 +695,20 @@ reset-selinux-labels $ext="" $variant="" $version="":
     fi
 
     filecontexts="/etc/selinux/targeted/contexts/files/file_contexts"
+
+    # Load image into rootful podman-machine
+    if ! {{ podman-remote }} image exists $fq_name && ! {{ podman }} image exists $fq_name; then
+        echo "{{ style('error') }}Error:{{ NORMAL }} Image \"$fq_name\" not in image-store" >&2
+        exit 1
+    fi
+    if ! {{ podman-remote }} image exists $registry/$image_name:$version; then
+        COPYTMP="$(mktemp -p {{ builddir }} -d -t podman_scp.XXXXXXXXXX)" && trap 'rm -rf $COPYTMP' EXIT SIGINT
+        TMPDIR="$COPYTMP" {{ podman }} image scp $registry/$image_name:$version podman-machine-default-root::
+        rm -rf "$COPYTMP"
+    fi
     echo "🏷️ Resetting SELinux labels"
     {{ podman }} image scp "$source_image" root@localhost::
-    $SUDO {{ podman }} run -ti {{podman_opts}} \
+    {{ podman-remote }} run -ti {{podman_opts}} \
         --volume "${PWD}:/var/srv" \
         --volume "${PWD}/../.dnf-cache:/var/cache/libdnf5" \
         --workdir "/var/srv" \
@@ -700,6 +716,36 @@ reset-selinux-labels $ext="" $variant="" $version="":
         "$source_image" \
         bash -c "${pre_commands}cd rootfs && setfiles -r . ${filecontexts} . && chcon --user=system_u --recursive ."
 
+
+# Podmaon Machine Init
+init-machine:
+    #!/usr/bin/env bash
+    set -ou pipefail
+    ram_size="$(( $(free --mega | awk '/^Mem:/{print $7}') / 2 ))"
+    ram_size="$(( ram_size >= 16384 ? 16384 : $(( ram_size >= 8192 ? 8192 : $(( ram_size >= 4096 ? 4096 : $(( ram_size >= 2048 ? 2048 : $(( ram_size >= 1024 ? 1024 : 0 )) )) )) )) ))"
+    {{ podman-remote }} machine init \
+        --rootful \
+        --memory "${ram_size}" \
+        --volume "{{ justfile_dir() + ":" + justfile_dir() }}" \
+        --volume "{{ env('HOME') + ":" + env('HOME') }}" 2>{{ builddir }}/error.log
+    ec=$?
+    if [ $ec != 0 ] && ! grep -q 'VM already exists' {{ builddir }}/error.log; then
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(sed -E 's/Error:\s//' {{ builddir }}/error.log)" >&2
+        exit $ec
+    fi
+    exit 0
+
+# Start Podman Machine
+start-machine: init-machine
+    #!/usr/bin/env bash
+    set -ou pipefail
+    {{ podman }} machine start 2>{{ builddir }}/error.log
+    ec=$?
+    if [ $ec != 0 ] && ! grep -q 'already running' {{ builddir }}/error.log; then
+        printf '{{ style('error') }}Error:{{ NORMAL }} %s\n' "$(sed -E 's/Error:\s//' {{ builddir }}/error.log)" >&2
+        exit $ec
+    fi
+    exit 0
 
 [group('Utility')]
 explode-yaml:
