@@ -63,7 +63,7 @@ copr_repos="$(ext-get-array copr_repos)"
 rpm_fusion_repos="$(ext-get-array rpm_fusion_repos)"
 upholds_list="$(ext-get-array upholds)"
 files="$(ext-get-array files)"
-cleanup_files="$(ext-get-array files)"
+cleanup_files="$(ext-get-array cleanup_files)"
 
 '
 
