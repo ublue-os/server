@@ -657,9 +657,42 @@ reset-selinux-labels $ext="" $variant="" $version="":
     # Only install the packages in the container if we have an SELinux policy
     # module in the sysext and might thus need specific labels
     pre_commands=""
+    if [[ -d "./rootfs/usr/share/selinux/packages" ]]; then
+        dnf_opts=""
+        if [[ "$dnf_weak_deps" == false ]]; then
+            dnf_opts="--setopt=install_weak_deps=False"
+        fi
+        if [[ -n "$exclude_packages" && "$exclude_packages" != "null" ]]; then
+            excluded_packages="$(echo "$exclude_packages" | xargs)"
+            for p in ${excluded_packages}; do
+                echo "➖ Excluding package: ${p}"
+                dnf_opts+=" --exclude=${p}"
+            done
+        fi
+
+        if [[ -n "$pre_commands" && "$pre_commands" != "null" ]]; then
+            pre_commands+="$pre_commands ; "
+        fi
+
+        disablerepos=""
+        if [[ -n "$disable_repos" && "$disable_repos" != "null" ]]; then
+            for r in $disable_repos; do
+                echo "➖ Disabling repo: ${r}"
+                disablerepos+=" --disablerepo=${r}"
+            done
+        fi
+
+        if [[ -n "$packages" && "$packages" != "null" ]]; then
+            pre_commands+="export FORCE_COLUMNS=100 && dnf install -y ${dnf_opts} ${disablerepos} ./rpms/* && "
+        fi
+
+        mkdir -p ../.dnf-cache
+    fi
+
     filecontexts="/etc/selinux/targeted/contexts/files/file_contexts"
     echo "🏷️ Resetting SELinux labels"
-    podman run -ti {{podman_opts}} \
+    {{ podman }} image scp "$source_image" root@localhost::
+    $SUDO {{ podman }} run -ti {{podman_opts}} \
         --volume "${PWD}:/var/srv" \
         --volume "${PWD}/../.dnf-cache:/var/cache/libdnf5" \
         --workdir "/var/srv" \
