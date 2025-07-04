@@ -11,6 +11,7 @@
 Cayo currently offers two primary images: one based on CentOS 10 and another on Fedora 42. The rationale for providing both images addresses hardware compatibility.
 
 Specifically, the CentOS-based image necessitates a CPU that meets [x86-64-v3 requirements](https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels).  At this point in time, Fedora does not have this hardware limitation.
+
 - https://ghcr.io/ublue-os/cayo:centos (CentOS)
 - https://ghcr.io/ublue-os/cayo:fedora (Fedora)
 
@@ -30,6 +31,7 @@ One of the most straightforward installation methods currently available (at the
 Due to the installation process running from within a RAM disk, it's crucial that the target machine has adequate RAM to avoid "out of space" errors.
 
 The following minimum RAM allocations are recommended for successful installations of Cayo images via Podman:
+
 - `cayo:centos` - 8GB RAM minimum
 - `cayo:fedora` - 12GB RAM minimum
 
