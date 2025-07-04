@@ -1,0 +1,758 @@
+set unstable := true
+
+just := just_executable()
+podman := require('podman')
+podman-remote := which('podman-remote') || podman + ' --remote'
+builddir := shell('mkdir -p $1 && echo $1', absolute_path(env('CAYO_BUILD', '../build')))
+
+ext := env('CAYO_EXT',  shell('yq ".defaults.extension" extensions.yaml'))
+variant := env('CAYO_VARIANT', shell('yq ".defaults.variant" extensions.yaml'))
+version := env('CAYO_VERSION', shell('yq ".defaults.version" extensions.yaml'))
+# print more logs to help debugging. Enable by setting CAYO_DEBUG env variable.
+# Defaut to false.
+debug := env('CAYO_DEBUG', '')
+dnf_arch := env('CAYO_DNF_ARCH', 'x86_64')
+arch := "x86_64"
+# Default podman options
+podman_opts := "--rm --arch=" + arch + " --security-opt label=disable"
+
+# zstd compression is still experimental in EROFS
+# compression := "zstd"
+compression := "lz4"
+
+
+[private]
+default-inputs := '
+: ${ext:=' + ext + '}
+: ${variant:=' + variant + '}
+: ${version:=' + version + '}
+'
+
+[private]
+get-names := 'function ext-get() {
+    if [ -z "$1" ]; then
+      echo "ext-get: requires a key argument"
+      exit 1
+    fi
+    KEY="${1}"
+    data=$(IFS="" yq -Mr "explode(.)|.extensions|.' + ext + '-$variant-$version|.$KEY" extensions.yaml)
+    echo ${data}
+}
+function ext-get-array() {
+    if [ -z "$1" ]; then
+      echo "ext-get: requires a key argument"
+      exit 1
+    fi
+    KEY="${1}"
+    data=$(IFS="" yq -Mr "explode(.)|.extensions|.' + ext + '-$variant-$version|.$KEY[]" extensions.yaml)
+    echo ${data}
+}
+description="$(ext-get description)"
+external_repos="$(ext-get-array external_repos)"
+name="$(ext-get name)"
+version_package="$(ext-get version_package)"
+manual_version="$(ext-get version)"
+source_image="$(ext-get image)"
+packages="$(ext-get-array packages)"
+exclude_packages="$(ext-get-array exclude_packages)"
+enable_repos="$(ext-get-array enable_repos)"
+disable_repos="$(ext-get-array disable_repos)"
+dnf_weak_deps="$(ext-get dnf_weak_deps)||true"
+pre_commands="$(ext-get-array pre_commands)"
+copr_repos="$(ext-get-array copr_repos)"
+rpm_fusion_repos="$(ext-get-array rpm_fusion_repos)"
+upholds_list="$(ext-get-array upholds)"
+files="$(ext-get-array files)"
+cleanup_files="$(ext-get-array cleanup_files)"
+
+'
+
+[group('Utility')]
+check-valid-extension $ext="" $variant="" $version="":
+    #!/usr/bin/env bash
+    set -e
+    {{ default-inputs }}
+    data=$(IFS='' yq -Mr "explode(.)|.extensions|.{{ ext }}-$variant-$version" extensions.yaml)
+    if [[ "null" == "$data" ]]; then
+        echo "ERROR Invalid inputs: no matching extension definition found for: {{ ext }}-${variant}-${version}"
+        exit 1
+    fi
+
+check $ext="" $variant="" $version="":
+    #!/usr/bin/env bash
+    set -e
+    {{ default-inputs }}
+    {{ get-names }}
+    echo Name: $name
+    echo Description: $description
+    echo Source Image: $source_image
+    echo Packages: "${packages[@]}"
+    echo External Repo: $external_repo
+
+build $ext="" $variant="" $version="":
+    #!/usr/bin/env bash
+    set -e
+    {{ default-inputs }}
+    {{ get-names }}
+    echo building: $ext-$variant-$version
+    {{ just }} clean $ext $variant $version
+    {{ just }} download-rpms $ext $variant $version
+    {{ just }} download-manual $ext $variant $version
+    {{ just }} version $ext $variant $version
+    {{ just }} inputs $ext $variant $version
+    {{ just }} setup-rootfs $ext $variant $version
+    {{ just }} install-rpms $ext $variant $version
+    {{ just }} install-files $ext $variant $version
+    {{ just }} build-manual $ext $variant $version
+    {{ just }} install-manual $ext $variant $version
+    {{ just }} move-etc $ext $variant $version
+    {{ just }} validate $ext $variant $version
+    {{ just }} reset-selinux-labels $ext $variant $version
+    {{ just }} build-erofs $ext $variant $version
+
+
+prepare-build $ext="" $variant="" $version="":
+    #!/usr/bin/env bash
+    set -e
+    {{ default-inputs }}
+    {{ get-names }}
+    echo building: $ext-$variant-$version
+    {{ just }} clean $ext $variant $version
+    {{ just }} download-rpms $ext $variant $version
+    {{ just }} download-manual $ext $variant $version
+    {{ just }} version $ext $variant $version
+    {{ just }} inputs $ext $variant $version
+
+resume-build $ext="" $variant="" $version="":
+    {{ just }} setup-rootfs $ext $variant $version
+    {{ just }} install-rpms $ext $variant $version
+    {{ just }} install-files $ext $variant $version
+    {{ just }} build-manual $ext $variant $version
+    {{ just }} install-manual $ext $variant $version
+    {{ just }} move-etc $ext $variant $version
+    {{ just }} validate $ext $variant $version
+    {{ just }} reset-selinux-labels $ext $variant $version
+    {{ just }} build-erofs $ext $variant $version
+
+
+clean $ext="" $variant="" $version="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    {{ default-inputs }}
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+
+    if [[ "${UID}" == "0" ]]; then
+        SUDO=""
+    else
+        SUDO="sudo"
+    fi
+    # change to the $ext directory
+    cd {{ ext }}
+
+    echo "🧹 Cleaning up files from previous builds"
+    rm -rf inputs scripts digest version version_id
+    rm -rf ./rpms
+    rm -rf ./binaries
+    ${SUDO} rm -rf ./rootfs
+    rm -f ./*.raw
+
+download-rpms $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+
+    {{ get-names }}
+    # Skip this step if we have not been asked to download packages
+    if [[ -z "$packages" ]]; then
+        exit 0
+    fi
+    # change to the $ext directory
+    cd {{ ext }}
+    enablerepos=""
+    if [[ -n "$enable_repos" && "$enable_repos" != "null" ]]; then
+        for r in $enable_repos; do
+            echo "➕ Enabling repo: ${r}"
+            enablerepos+=" --enablerepo=${r}"
+        done
+    fi
+
+    disablerepos=""
+    if [[ -n "$disable_repos"  && "$disable_repos" != "null" ]]; then
+        for r in $disable_repos; do
+            echo "➖ Disabling repo: ${r}"
+            disablerepos+=" --disablerepo=${r}"
+        done
+    fi
+
+    dnf_arch=""
+    if [[ -z "{{dnf_arch}}" ]]; then
+        dnf_arches="noarch {{arch}}"
+    else
+        dnf_arches="{{dnf_arch}}"
+    fi
+    for a in ${dnf_arches}; do
+        dnf_arch+="--arch=${a} "
+    done
+
+    dnf_opts=""
+    if [[ "$dnf_weak_deps" == false ]]; then
+        dnf_opts="--setopt=install_weak_deps=False"
+    fi
+    if [[ -n "$exclude_packages" ]]; then
+        excluded_packages="$(echo "$exclude_packages" | xargs)"
+        for p in ${excluded_packages}; do
+            echo "➖ Excluding package: ${p}"
+            dnf_opts+=" --exclude=${p}"
+        done
+    fi
+
+    packages="$(echo "${packages[@]}" | xargs)"
+
+    pre_commands=""
+    if [[ -n "$pre_commands" && "$pre_commands" != "null" ]]; then
+        pre_commands+="${pre_commands[@]} ; "
+    fi
+    if [[ -n "${copr_repos[@]}" ]]; then
+        pre_commands+="dnf install -y dnf5-plugins"
+        for r in "${copr_repos[@]}"; do
+            pre_commands+=" ; dnf copr enable -y ${r}"
+        done
+        pre_commands+=" ; "
+    fi
+    if [[ -n "$external_repos" && "$external_repos" != "null" ]]; then
+        pre_commands+="dnf install -y dnf5-plugins"
+        for r in "${external_repos[@]}"; do
+            pre_commands+=" ; dnf config-manager addrepo --from-repofile=${r}"
+        done
+        pre_commands+=" ; "
+    fi
+
+    if [[ -n "$rpm_fusion_repos" && "$rpm_fusion_repos" != "null" ]]; then
+        release=$(podman run {{podman_opts}} "$source_image" \
+            bash -c 'rpm -E %fedora' | tr -d '\n')
+        for r in ${rpm_fusion_repos[@]}; do
+            if [[ "${r}" != "free" ]] && [[ "${r}" != "nonfree" ]]; then
+                echo "Unrecognized RPM Fusion repo: ${r}"
+                exit 1
+            fi
+            echo "➕ Enabling RPM Fusion repo: '${r}'"
+            pre_commands+=" dnf install -y https://mirrors.rpmfusion.org/${r}/fedora/rpmfusion-${r}-release-${release}.noarch.rpm ;"
+        done
+    fi
+
+    mkdir -p ../.dnf-cache
+
+    mkdir rpms
+    cd rpms
+
+    echo "⬇️ Downloading packages (${dnf_arches}): ${packages[@]}"
+    {{ podman }} run -ti {{podman_opts}} \
+        --volume "${PWD}:/var/srv" \
+        --volume "${PWD}/../../.dnf-cache:/var/cache/libdnf5" \
+        --workdir "/var/srv" \
+        "$source_image" \
+        bash -xc "export FORCE_COLUMNS=100 && ${pre_commands}dnf download --resolve ${dnf_arch} ${dnf_opts} ${disablerepos} ${enablerepos} ${packages}"
+
+
+download-manual $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+
+    {{ get-names }}
+    cd {{ ext }}
+    # Skip this step if there is no file named "download-manual.sh" in the extension directory
+    if [[ ! -f "download-manual.sh" ]]; then
+        echo "❌ Skipping manual download, no 'download-manual.sh' script found in the extension directory."
+        exit 0
+    fi
+
+    echo "⬇️ Downloading manual files"
+    {{ podman }} run -ti {{podman_opts}} \
+        --volume "${PWD}:/var/srv" \
+        --workdir "/var/srv" \
+        "$source_image" \
+        bash -xc "download-manual.sh"
+
+version $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+    cd {{ ext }}
+    package_version() {
+        rpm="${1}"
+        epoch="$(rpm -qp --queryformat '%{EPOCH}' ${rpm})"
+        version="$(rpm -qp --queryformat '%{VERSION}-%{RELEASE}' ${rpm})"
+        if [[ "${epoch}" == "(none)" ]]; then
+            epoch=""
+        else
+            epoch="${epoch}-"
+        fi
+        echo "${epoch}${version}" > ./version
+    }
+
+    echo "🏷️ Writing down version"
+
+    if [[ -n "$version_package"  && "$version_package" != "null" ]]; then
+        if [[ $(ls rpms/*.rpm | grep -cE "^rpms/$version_package-[0-9]" ) -ne 1 ]]; then
+            echo "More than one package matched: $version_package."
+            exit 1
+        fi
+        rpm="$(ls rpms/*.rpm | sort -h | grep -E "^rpms/$version_package-[0-9]" | head -1)"
+        package_version "${rpm}"
+        exit 0
+    fi
+
+    if [[ -n "$manual_version"  && "$manual_version" != "null" ]]; then
+        echo "${manual_version}" > ./version
+        exit 0
+    fi
+
+    if [[ -z "$packages" ]]; then
+        echo "No package listed. You must define the 'version' recipe in your justfile for this sysext."
+        exit 1
+    fi
+
+    packages=($(echo "${packages[@]}" | xargs))
+
+    if [[ ${#packages[@]} -ne 1 ]]; then
+        if [[ $(ls rpms/*.rpm | grep -cE "^rpms/$name-[0-9]") -ne 1 ]]; then
+            echo "More that one package listed. Set 'version_package' or define the 'version' recipe in your justfile for this sysext."
+            exit 1
+        fi
+        rpm="$(ls rpms/*.rpm | sort -h | grep -E "^rpms/$name-[0-9]" | head -1)"
+        package_version "${rpm}"
+        exit 0
+    fi
+
+    # Only one package listed, let's use its version
+    rpm="$(ls rpms/${packages[0]}*.rpm | sort -h | head -1)"
+    package_version "${rpm}"
+
+inputs $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+    cd {{ ext }}
+    echo "🏷️ Writing down inputs"
+
+    # Make sure that we always have a version set
+    version=""
+    if [[ -f ./version ]]; then
+        version="$(cat ./version)"
+    else
+        version=$(podman run {{podman_opts}} "$source_image" \
+            bash -c 'source /etc/os-release ; echo -n ${OSTREE_VERSION}')
+    fi
+    # Remove special characters from the version
+    version="$(cat ./version | sed "s/\^/_/" | sed "s/:/_/")"
+    # Write back version to file
+    echo "${version}" > ./version
+
+    # Get and store name, tag and digest for the container image used to build the sysext
+    echo ""$source_image"@$(podman inspect "$source_image" | jq -r '.[0].Digest')" > ./digest
+
+    # Store version_id (Fedora release)
+    version_id=$(podman run {{podman_opts}} "$source_image" \
+        bash -c 'source /etc/os-release ; echo -n ${VERSION_ID}')
+    echo "${version_id}" > ./version_id
+
+    # Store the hashes of the RPMs used to build the sysext
+    if [[ -d ./rpms ]]; then
+        cd rpms
+        sha256sum *.rpm >> ../inputs
+        cd ..
+    fi
+    # Store the hashes of all the files added to the sysext
+    # if [[ -n "files" ]]; then
+    #     for f in files; do
+    #         find ${f} -type f | sort -h | xargs sha256sum >> ./inputs
+    #     done
+    # fi
+    # Make sure that we have an inputs file in all cases
+    touch ./inputs
+
+    # Store the hashes of the scripts used to build the sysext
+    sha256sum ../Justfile >> ./scripts
+    cd ..
+    sha256sum extensions.yaml >> ./${ext}/scripts
+
+setup-rootfs $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+    cd {{ ext }}
+
+    if [[ "${UID}" == "0" ]]; then
+        SUDO=""
+    else
+        SUDO="sudo"
+    fi
+
+    version_id="$(cat ./version_id)"
+
+    mkdir rootfs
+    cd rootfs
+
+    # Only ask systemd to reload its configuration if we have services to
+    # uphold / start on boot
+    reload_manager="false"
+
+    # Filter the variable into an array
+    upholds=()
+    mapfile -t upholds_raw <<< "$upholds_list"
+    for uphold in "${upholds_raw[@]}"; do
+        if [[ -z "${uphold}" ]]; then
+            continue
+        fi
+        upholds+=("${uphold}")
+    done
+    # Setup upholds if there are any
+    if [[ "${#upholds[@]}" -ne 0 ]]; then
+        # Set now, but will be used later in the extension config file
+        reload_manager="true"
+        echo "➡️ Setting up upholds for: ${upholds[@]}"
+        ${SUDO} install -d -m 0755 -o 0 -g 0 usr/lib/systemd/system/multi-user.target.d
+        {
+        echo "[Unit]"
+        for uphold in "${upholds[@]}"; do
+            echo "Upholds=${uphold}"
+        done
+        } | ${SUDO} tee "usr/lib/systemd/system/multi-user.target.d/10-$name-sysext.conf" > /dev/null
+    fi
+
+    # Post process architecture to match systemd architecture list
+    if [[ {{ arch }} == "x86_64" ]]; then
+        arch="x86-64"
+    elif [[ $arch == "aarch64" ]]; then
+        arch="arm64"
+    else
+        echo "Unsupported architecture"
+        exit 1
+    fi
+
+    echo "➡️ Setting up extension config file"
+    ${SUDO} install -d -m0755 usr/lib/extension-release.d
+    {
+    # We can not restict the ID to `fedora` here as it will break support for
+    # Universal Blue. See: https://github.com/systemd/systemd/pull/37648
+    echo "ID=\"$variant\""
+    echo "VERSION_ID=\"${version_id}\""
+    echo "ARCHITECTURE=\"${arch}\""
+    if [[ "${reload_manager}"  == "true" ]]; then
+        echo "EXTENSION_RELOAD_MANAGER=1"
+    fi
+    } | ${SUDO} tee "usr/lib/extension-release.d/extension-release.$name" > /dev/null
+
+install-rpms $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+
+    # Skip this step if we have not been asked to install packages
+    if [[ -z "$packages" ]]; then
+        exit 0
+    fi
+
+    if [[ "${UID}" == "0" ]]; then
+        SUDO=""
+    else
+        SUDO="sudo"
+    fi
+    cd {{ ext }}/rootfs
+
+    echo "📦 Extracting packages:"
+    for rpm in ../rpms/*.rpm; do
+        echo "$(basename ${rpm})"
+        rpm2cpio "${rpm}" | ${SUDO} cpio -idmv &> /dev/null
+    done
+
+install-files $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+    # Skip this step if we have not been asked to copy files
+    if [[ -z "$files" ]]; then
+        exit 0
+    fi
+
+    if [[ "${UID}" == "0" ]]; then
+        SUDO=""
+    else
+        SUDO="sudo"
+    fi
+
+    cd {{ ext }}/rootfs
+
+    echo "📁 Copying additional files from: $files"
+    for f in $files; do
+        ${SUDO} cp -a ../${f} .
+    done
+
+build-manual $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+    cd {{ ext }}
+    # Skip this step if there is no file named "install-manual.sh" in the extension directory
+    if [[ ! -f "build-manual.sh" ]]; then
+        echo "- Skipping manual build, no 'build-manual.sh' script found in the extension directory."
+        exit 0
+    fi
+
+    echo "📁 Building extension"
+      {{ podman }} run -ti {{podman_opts}} \
+        --volume "${PWD}:/var/srv" \
+        --workdir "/var/srv" \
+        "$source_image" \
+        bash -xc "./build-manual.sh"
+
+
+install-manual $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+    cd {{ ext }}
+    # Skip this step if there is no file named "install-manual.sh" in the extension directory
+    if [[ ! -f "install-manual.sh" ]]; then
+        echo "- Skipping manual install, no 'install-manual.sh' script found in the extension directory."
+        exit 0
+    fi
+
+    echo "📁 Installing manual files"
+    bash -xc "install-manual.sh"
+
+move-etc $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+
+    if [[ "${UID}" == "0" ]]; then
+        SUDO=""
+    else
+        SUDO="sudo"
+    fi
+    cd {{ ext }}/rootfs
+
+    if [[ -d ./etc ]] then
+        echo "➡️ Moving /etc to /usr/etc"
+        ${SUDO} mv --no-clobber --no-copy ./etc ./usr/etc
+    fi
+
+validate $ext="" $variant="" $version="":
+    #!/bin/bash
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+    {{ get-names }}
+    cd {{ ext }}
+    # Some checks vary by Fedora release
+    version_id="$(cat ./version_id)"
+
+    failed_checks=0
+
+    if [[ "${UID}" == "0" ]]; then
+        SUDO=""
+    else
+        SUDO="sudo"
+    fi
+
+    cd rootfs
+
+    # Remove files as requested
+    if [[ -n "$cleanup_files" && "$cleanup_files" != "null" ]]; then
+        cleanup=($(echo "$cleanup_files" | xargs))
+        for f in "${cleanup[@]}"; do
+            echo "🧹 Cleaning up file: ${f}"
+            rm ./${f}
+        done
+    fi
+
+    # Remove all empty directories in /var, /run and /opt
+    for d in 'var' 'run' 'opt'; do
+        if [[ -d "./${d}" ]]; then
+            echo "🧹 Cleaning up empty directories in /${d}"
+            ${SUDO} find "./${d}" -type d -empty -delete
+        fi
+    done
+
+    # Check sbin/bin merge starting with Fedora 42
+    # need to verify status of this on centos 10+
+    if [[ "${version_id}" -ge 42 ]] && [[ -d "usr/sbin" ]]; then
+        failed_checks=$((failed_checks+1))
+        echo "❌ Found /usr/sbin directory on Fedora 42+ sysext (see bin/sbin merge change)"
+        ls -alh usr/sbin
+    fi
+
+    # Check that /var is empty as it will be ignored
+    if [[ -d "var" ]]; then
+        failed_checks=$((failed_checks+1))
+        echo "❌ Found /var directory, which will be ignored: clear it or convert it to a tmpfiles.d config"
+        ls -alh var
+    fi
+
+    # Check that /run is empty as it will be ignored
+    if [[ -d "run" ]]; then
+        failed_checks=$((failed_checks+1))
+        echo "❌ Found /run directory, which will be ignored: clear it or convert it to a tmpfiles.d config"
+        ls -alh run
+    fi
+
+    # Check that we don't use /opt as it will not work
+    if [[ -d "opt" ]]; then
+        failed_checks=$((failed_checks+1))
+        echo "❌ Found /opt directory, which will not work: move the content to /usr/lib"
+        ls -alh opt
+    fi
+
+    # Check that we don't have other directories as they will be ignored
+    if [[ "$(ls | grep -cvE "^usr$|^run$|^var$|^opt$")" -ne 0 ]]; then
+        failed_checks=$((failed_checks+1))
+        echo "❌ Found other directories which will be ignored: move them or clear them"
+        ls | grep -vE "^usr$|^run$|^var$|^opt$"
+    fi
+
+    if [[ "${failed_checks}" -ne 0 ]]; then
+        exit 1
+    fi
+reset-selinux-labels $ext="" $variant="" $version="":
+    #!/bin/bash
+    {{ default-inputs }}
+    : "${registry:=localhost}"
+    {{ get-names }}
+    fq_name="$registry/$image_name:$version"
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+
+    if [[ "${UID}" == "0" ]]; then
+        SUDO=""
+    else
+        SUDO="sudo"
+    fi
+
+    cd {{ ext }}
+
+    # Only install the packages in the container if we have an SELinux policy
+    # module in the sysext and might thus need specific labels
+    pre_commands=""
+    if [[ -d "./rootfs/usr/share/selinux/packages" ]]; then
+        dnf_opts=""
+        if [[ "$dnf_weak_deps" == false ]]; then
+            dnf_opts="--setopt=install_weak_deps=False"
+        fi
+        if [[ -n "$exclude_packages" && "$exclude_packages" != "null" ]]; then
+            excluded_packages="$(echo "$exclude_packages" | xargs)"
+            for p in ${excluded_packages}; do
+                echo "➖ Excluding package: ${p}"
+                dnf_opts+=" --exclude=${p}"
+            done
+        fi
+
+        if [[ -n "$pre_commands" && "$pre_commands" != "null" ]]; then
+            pre_commands+="$pre_commands ; "
+        fi
+
+        disablerepos=""
+        if [[ -n "$disable_repos" && "$disable_repos" != "null" ]]; then
+            for r in $disable_repos; do
+                echo "➖ Disabling repo: ${r}"
+                disablerepos+=" --disablerepo=${r}"
+            done
+        fi
+
+        if [[ -n "$packages" && "$packages" != "null" ]]; then
+            pre_commands+="export FORCE_COLUMNS=100 && dnf install -y ${dnf_opts} ${disablerepos} ./rpms/* && "
+        fi
+
+        mkdir -p ../.dnf-cache
+    fi
+
+    filecontexts="/etc/selinux/targeted/contexts/files/file_contexts"
+
+    echo "🏷️ Resetting SELinux labels"
+    {{ podman }} image scp "$source_image" root@localhost::
+    $SUDO {{ podman }} run -ti {{podman_opts}} \
+        --volume "${PWD}:/var/srv" \
+        --volume "${PWD}/../.dnf-cache:/var/cache/libdnf5" \
+        --workdir "/var/srv" \
+        --privileged \
+        "$source_image" \
+        bash -c "${pre_commands}cd rootfs && setfiles -r . ${filecontexts} . && chcon --user=system_u --recursive ."
+
+# Creates the EROFS sysext file
+build-erofs $ext="" $variant="" $version="":
+    #!/bin/bash
+    {{ default-inputs }}
+    : "${registry:=localhost}"
+    {{ get-names }}
+    fq_name="$registry/$image_name:$version"
+    set -euo pipefail
+    if [[ -n "{{debug}}" ]]; then
+      set -x
+    fi
+
+    if [[ "${UID}" == "0" ]]; then
+        SUDO=""
+    else
+        SUDO="sudo"
+    fi
+
+    cd {{ ext }}
+
+    version="$(cat ./version)"
+    version_id="$(cat ./version_id)"
+    # Post process architecture to match systemd architecture list
+    if [[ {{arch}} == "x86_64" ]]; then
+        arch="x86-64"
+    elif [[ {{arch}} == "aarch64" ]]; then
+        arch="arm64"
+    else
+        echo "Unsupported architecture"
+        exit 1
+    fi
+
+    echo "🔒 Creating EROFS sysext ({{compression}})"
+    ${SUDO} mkfs.erofs {{ext}}-${version}-${version_id}-${arch}.raw rootfs > /dev/null
+
+    if [[ "${UID}" != "0" ]]; then
+        ${SUDO} chown "${USER}:" {{ext}}*.raw
+    fi
+
+    echo "🎉 Done!"
+
+
+[group('Utility')]
+explode-yaml:
+    yq -r "explode(.)|.extensions" extensions.yaml

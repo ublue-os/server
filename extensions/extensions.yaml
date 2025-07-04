@@ -1,0 +1,61 @@
+---
+centos-10: &centos-10
+  image: "localhost/cayo:centos10"
+fedora-42: &fedora-42
+  image: "localhost/cayo:fedora42"
+
+vim-base: &vim-base
+  description: "VIM Editor"
+  name: vim
+  packages:
+    - vim
+docker-ce-base: &docker-ce-base
+  description: "Docker CE"
+  name: docker-ce
+  upholds:
+    - "docker.socket"
+  packages:
+    - docker-ce
+    - docker-ce-cli
+    - containerd.io
+    - docker-buildx-plugin
+    - docker-compose-plugin
+  files:
+    - usr
+cockpit-zfs-base: &cockpit-zfs-base
+  description: "Cockpit ZFS Extension"
+  name: cockpit-zfs
+  version: "1.2.5"
+
+
+docker-ce-fedora: &docker-ce-fedora
+  external_repos:
+    - "https://download.docker.com/linux/fedora/docker-ce.repo"
+docker-ce-centos: &docker-ce-centos
+  external_repo:
+    - "https://somecentos.repo"
+
+defaults:
+  variant: fedora
+  version: 42
+  extension: vim
+
+extensions:
+  vim-centos-10:
+    !!merge <<:
+      - *centos-10
+      - *vim-base
+  vim-fedora-42:
+    !!merge <<:
+      - *fedora-42
+      - *vim-base
+  docker-ce-centos-10:
+    !!merge <<:
+      - *centos-10
+      - *docker-ce-centos
+      - *docker-ce-base
+  docker-ce-fedora-42:
+    !!merge <<:
+      - *fedora-42
+      - *docker-ce-fedora
+      - *docker-ce-base
