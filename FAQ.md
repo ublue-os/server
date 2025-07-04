@@ -52,7 +52,7 @@ python -m http.server [port_number]
 ```
 
 
-#### Cayo:10 (CentOS) Install:
+#### `cayo:centos` Install:
 The following command assumes the target hard drive is `/dev/sda` and the `authorized_keys` file has been created as described above.
 ```
 sudo podman run \
@@ -62,11 +62,11 @@ sudo podman run \
 -v /var/lib/containers:/var/lib/containers \
 -v ~/.ssh:/temp \
 --security-opt label=type:unconfined_t \
-ghcr.io/ublue-os/cayo:10 \
+ghcr.io/ublue-os/cayo:centos \
 bootc install to-disk /dev/sda --root-ssh-authorized-keys /temp/authorized_keys
 ```
 
-#### Cayo:42 (Fedora) Install:
+#### `cayo:fedora` Install:
 The following command assumes the target hard drive is `/dev/sda` and the `authorized_keys` file has been created as described above.
 
 __NOTE:__  Fedora-based installations require explicit specification of the root filesystem type, using the `bootc` argument `--filesystem` at install.
@@ -78,7 +78,7 @@ sudo podman run \
 -v /var/lib/containers:/var/lib/containers \
 -v ~/.ssh:/temp \
 --security-opt label=type:unconfined_t \
-ghcr.io/ublue-os/cayo:42 \
+ghcr.io/ublue-os/cayo:fedora \
 bootc install to-disk /dev/sda --root-ssh-authorized-keys /temp/authorized_keys --filesystem xfs
 ```
 
